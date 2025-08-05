@@ -1,49 +1,5 @@
 {
-    "name": "Python DevContainer Demo",
     "build": {
-        "dockerfile": "Dockerfile",
-        "context": ".."
-    },
-    "workspaceFolder": "/workspace",
-    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
-    
-    // VS Code customizations
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "ms-python.python",
-                "ms-python.flake8",
-                "ms-python.black-formatter",
-                "ms-python.mypy-type-checker",
-                "ms-toolsai.jupyter",
-                "charliermarsh.ruff"
-            ],
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/local/bin/python3",
-                "python.linting.enabled": true,
-                "python.linting.flake8Enabled": true,
-                "python.formatting.provider": "black",
-                "python.testing.pytestEnabled": true,
-                "python.testing.unittestEnabled": false,
-                "editor.formatOnSave": true,
-                "editor.codeActionsOnSave": {
-                    "source.organizeImports": "explicit"
-                }
-            }
-        }
-    },
-
-    // Forward ports for web development
-    "forwardPorts": [8000, 5000, 3000],
-
-    // Post-create command to set up the environment
-    "postCreateCommand": "echo '🎉 DevContainer is ready! Try: python main.py'",
-
-    // Run as non-root user
-    "remoteUser": "coder",
-
-    // Mount the Docker socket to enable Docker-in-Docker if needed
-    "mounts": [
-        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-    ]
+        "dockerfile": "Dockerfile"
+    }
 }
