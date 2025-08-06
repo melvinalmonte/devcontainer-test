@@ -1,5 +1,10 @@
 {
-    "build": {
-        "dockerfile": "Dockerfile"
+  "name": "Coder Workspace with Go",
+  "image": "docker.io/library/node:18-alpine",
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.21.7"
     }
+  },
+  "workspaceFolder": "/workspace"
 }
