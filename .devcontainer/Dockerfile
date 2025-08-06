@@ -1,7 +1,7 @@
   FROM ubuntu
 
   RUN apt-get update
-  RUN apt-get install vim sudo curl wget -y
+  RUN apt-get install vim sudo curl wget git -y
 
   # Install Go
   RUN wget -O go.tar.gz https://go.dev/dl/go1.21.5.linux-amd64.tar.gz && \
