@@ -1,10 +1,11 @@
 {
-  "name": "Coder Workspace with Go",
+  "name": "Node + Go (debug build)",
   "image": "docker.io/library/node:18-alpine",
   "features": {
     "ghcr.io/devcontainers/features/go:1": {
       "version": "1.21.7"
     }
   },
+  "postCreateCommand": "echo \"→ Node:\" && node -v && echo \"→ Go:\" && go version",
   "workspaceFolder": "/workspace"
 }
