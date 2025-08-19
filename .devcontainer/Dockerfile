@@ -45,9 +45,26 @@ RUN curl -L -o maven.vsix "https://open-vsx.org/api/vscjava/vscode-maven/0.44.0/
 # Go extensions
 RUN curl -L -o go.vsix "https://open-vsx.org/api/golang/Go/0.48.0/file/golang.Go-0.48.0.vsix"
 
+# C# (community build on Open VSX)
+RUN curl -L -o csharp.vsix "https://open-vsx.org/api/muhammad-sammy/csharp/2.84.19/file/muhammad-sammy.csharp-2.84.19.vsix"
+RUN curl -L -o nuget-gallery.vsix "https://open-vsx.org/api/patcx/vscode-nuget-gallery/1.2.4/file/patcx.vscode-nuget-gallery-1.2.4.vsix"
+RUN curl -L -o solution-explorer.vsix "https://open-vsx.org/api/fernandoescolar/vscode-solution-explorer/0.9.1/file/fernandoescolar.vscode-solution-explorer-0.9.1.vsix"
+
 # General purpose extensions
 RUN curl -L -o terraform.vsix "https://open-vsx.org/api/hashicorp/terraform/web/2.34.5/file/hashicorp.terraform-2.34.5@web.vsix"
 RUN curl -L -o gitlab.vsix "https://open-vsx.org/api/GitLab/gitlab-workflow/6.36.0/file/GitLab.gitlab-workflow-6.36.0.vsix"
+RUN curl -L -o yaml.vsix "https://open-vsx.org/api/redhat/vscode-yaml/1.18.0/file/redhat.vscode-yaml-1.18.0.vsix"
+RUN curl -L -o rest-client.vsix "https://open-vsx.org/api/humao/rest-client/0.25.0/file/humao.rest-client-0.25.0.vsix"
+
+# Node.js extensions
+RUN curl -L -o eslint.vsix "https://open-vsx.org/api/dbaeumer/vscode-eslint/3.0.16/file/dbaeumer.vscode-eslint-3.0.16.vsix"
+RUN curl -L -o prettier.vsix "https://open-vsx.org/api/esbenp/prettier-vscode/11.0.0/file/esbenp.prettier-vscode-11.0.0.vsix"
+RUN curl -L -o npm-intellisense.vsix "https://open-vsx.org/api/christian-kohler/npm-intellisense/1.4.5/file/christian-kohler.npm-intellisense-1.4.5.vsix"
+RUN curl -L -o path-intellisense.vsix "https://open-vsx.org/api/christian-kohler/path-intellisense/2.8.0/file/christian-kohler.path-intellisense-2.8.0.vsix"
+RUN curl -L -o react-snippets.vsix "https://open-vsx.org/api/dsznajder/es7-react-js-snippets/4.4.3/file/dsznajder.es7-react-js-snippets-4.4.3.vsix"
+RUN curl -L -o tailwindcss.vsix "https://open-vsx.org/api/bradlc/vscode-tailwindcss/0.14.26/file/bradlc.vscode-tailwindcss-0.14.26.vsix"
+RUN curl -L -o angular-ls.vsix "https://open-vsx.org/api/Angular/ng-template/20.2.2/file/Angular.ng-template-20.2.2.vsix"
+
 
 # Verify downloaded extensions exist
 RUN ls -la /opt/vscode-extensions/
