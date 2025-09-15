@@ -32,59 +32,65 @@ RUN echo "coder:100000:65536" >> /etc/subuid && \
 # Configure sudo for coder user (needed for some operations)
 RUN echo "coder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-# Create Podman configuration script (using echo commands for better compatibility)
-RUN echo '#!/bin/bash' > /usr/local/bin/setup-podman.sh && \
-    echo 'echo "🐳 Configuring Podman for Kubernetes environment..."' >> /usr/local/bin/setup-podman.sh && \
-    echo 'mkdir -p /home/coder/.config/containers' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "[containers]" > /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "userns = \"\"" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "netns = \"host\"" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "seccomp_profile = \"\"" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "apparmor_profile = \"\"" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "default_sysctls = []" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
+# Create necessary directories for Podman
+RUN mkdir -p /home/coder/.config/containers && \
+    mkdir -p /home/coder/.local/share/containers/{storage,runroot}
+
+# Configure Podman for container-in-container compatibility
+RUN echo '[containers]' > /home/coder/.config/containers/containers.conf && \
+    echo '# Run containers in the same user namespace as Podman itself' >> /home/coder/.config/containers/containers.conf && \
+    echo 'userns = "host"' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Use host networking to avoid network namespace issues' >> /home/coder/.config/containers/containers.conf && \
+    echo 'netns = "host"' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Disable security profiles for container-in-container compatibility' >> /home/coder/.config/containers/containers.conf && \
+    echo 'seccomp_profile = ""' >> /home/coder/.config/containers/containers.conf && \
+    echo 'apparmor_profile = ""' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Default security options' >> /home/coder/.config/containers/containers.conf && \
+    echo 'default_sysctls = []' >> /home/coder/.config/containers/containers.conf && \
+    echo '' >> /home/coder/.config/containers/containers.conf && \
     echo '[engine]' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Engine configuration for container environments' >> /home/coder/.config/containers/containers.conf && \
     echo 'cgroup_manager = "cgroupfs"' >> /home/coder/.config/containers/containers.conf && \
     echo 'events_logger = "file"' >> /home/coder/.config/containers/containers.conf && \
     echo 'runtime = "crun"' >> /home/coder/.config/containers/containers.conf && \
-    echo 'runtime_supports_json = ["crun"]' >> /home/coder/.config/containers/containers.conf && \
-    echo '[registries.search]' >> /home/coder/.config/containers/registries.conf && \
-    echo 'registries = ["docker.io", "quay.io"]' >> /home/coder/.config/containers/registries.conf && \
+    echo '# Runtime options' >> /home/coder/.config/containers/containers.conf && \
+    echo 'runtime_supports_json = ["crun"]' >> /home/coder/.config/containers/containers.conf
+
+# Configure registries for Podman
+RUN echo '[registries.search]' > /home/coder/.config/containers/registries.conf && \
+    echo "registries = ['docker.io', 'quay.io', 'registry.redhat.io']" >> /home/coder/.config/containers/registries.conf && \
     echo '' >> /home/coder/.config/containers/registries.conf && \
     echo '[registries.insecure]' >> /home/coder/.config/containers/registries.conf && \
     echo 'registries = []' >> /home/coder/.config/containers/registries.conf && \
     echo '' >> /home/coder/.config/containers/registries.conf && \
     echo '[registries.block]' >> /home/coder/.config/containers/registries.conf && \
-    echo 'registries = []' >> /home/coder/.config/containers/registries.conf && \
-    echo '[storage]' >> /home/coder/.config/containers/storage.conf && \
-    echo 'driver = "overlay"' >> /home/coder/.config/containers/storage.conf && \
+    echo 'registries = []' >> /home/coder/.config/containers/registries.conf
+
+# Configure storage for Podman (KIND-compatible configuration)
+RUN echo '[storage]' > /home/coder/.config/containers/storage.conf && \
+    echo 'driver = "vfs"' >> /home/coder/.config/containers/storage.conf && \
     echo 'runroot = "/home/coder/.local/share/containers/runroot"' >> /home/coder/.config/containers/storage.conf && \
     echo 'graphroot = "/home/coder/.local/share/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
     echo '' >> /home/coder/.config/containers/storage.conf && \
-    echo '[storage.options.additionalimagestores]' >> /home/coder/.config/containers/storage.conf && \
-    echo 'additionalimagestores = []' >> /home/coder/.config/containers/storage.conf && \
-    echo '' >> /home/coder/.config/containers/storage.conf && \
-    echo '[storage.options.rootless_storage_path]' >> /home/coder/.config/containers/storage.conf && \
-    echo 'rootless_storage_path = "/home/coder/.local/share/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
-    echo '' >> /home/coder/.config/containers/storage.conf && \
-    echo 'chown -R coder:coder /home/coder/.config' >> /usr/local/bin/setup-podman.sh && \
-    echo 'chown -R coder:coder /home/coder/.local' >> /usr/local/bin/setup-podman.sh && \
-    echo 'rm -rf /home/coder/.local/share/containers/storage' >> /usr/local/bin/setup-podman.sh && \
-    echo 'mkdir -p /home/coder/.local/share/containers/{storage,runroot}' >> /usr/local/bin/setup-podman.sh && \
-    echo 'chown -R coder:coder /home/coder/.local' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "✅ Podman configuration completed"' >> /usr/local/bin/setup-podman.sh && \
-    chmod +x /usr/local/bin/setup-podman.sh
+    echo '[storage.options]' >> /home/coder/.config/containers/storage.conf && \
+    echo '# Use VFS driver for KIND compatibility (slower but more reliable)' >> /home/coder/.config/containers/storage.conf
+
+# Set proper ownership for all coder user files
+RUN chown -R coder:coder /home/coder/.config && \
+    chown -R coder:coder /home/coder/.local
 
 # Set environment variables for Podman
-ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot"
+
+# Create a wrapper script for Podman to run as root by default
+RUN mv /usr/bin/podman /usr/bin/podman-original && \
+    echo '#!/bin/bash' > /usr/bin/podman && \
+    echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
+    chmod +x /usr/bin/podman
 
 # Switch to coder user
 USER coder
 WORKDIR /home/coder
-
-# Run podman setup
-RUN /usr/local/bin/setup-podman.sh
 
 # Verify Podman installation
 RUN podman --version
