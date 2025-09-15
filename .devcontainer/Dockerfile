@@ -36,7 +36,7 @@ RUN mkdir -p /home/coder/.config/containers && \
     mkdir -p /home/coder/.local/share/containers/{storage,runroot}
 
 # Configure Podman for KIND/container compatibility
-RUN cat > /home/coder/.config/containers/containers.conf << 'EOF'
+RUN cat > /home/coder/.config/containers/containers.conf << EOF
 [containers]
 # Disable user namespaces for KIND compatibility
 userns = ""
@@ -58,7 +58,7 @@ runtime_supports_json = ["crun"]
 EOF
 
 # Configure registries for Podman
-RUN cat > /home/coder/.config/containers/registries.conf << 'EOF'
+RUN cat > /home/coder/.config/containers/registries.conf << EOF
 [registries.search]
 registries = ['docker.io', 'quay.io', 'registry.redhat.io']
 
@@ -70,7 +70,7 @@ registries = []
 EOF
 
 # Configure storage for Podman (KIND-compatible configuration)
-RUN cat > /home/coder/.config/containers/storage.conf << 'EOF'
+RUN cat > /home/coder/.config/containers/storage.conf << EOF
 [storage]
 driver = "vfs"
 runroot = "/home/coder/.local/share/containers/runroot"
