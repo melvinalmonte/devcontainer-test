@@ -17,10 +17,13 @@
     "/tmp:exec,suid,size=2g",
     "--tmpfs",
     "/run:exec,suid,size=2g",
-    "--tmpfs",
-    "/sys/fs/cgroup:rw,exec,suid,size=100m,mode=755"
+    "--volume",
+    "/sys/fs/cgroup:/sys/fs/cgroup:rw"
   ],
   "containerEnv": {
-    "TMPDIR": "/tmp"
+    "TMPDIR": "/tmp",
+    "CONTAINERS_CONF": "/etc/containers/containers.conf",
+    "CONTAINERS_STORAGE_CONF": "/etc/containers/storage.conf",
+    "CONTAINERS_REGISTRIES_CONF": "/etc/containers/registries.conf"
   }
 }

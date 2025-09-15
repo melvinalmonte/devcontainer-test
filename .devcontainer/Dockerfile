@@ -57,12 +57,7 @@ RUN if [ -f /usr/bin/podman ]; then \
     echo 'export CONTAINERS_CONF=/etc/containers/containers.conf' >> /usr/bin/podman && \
     echo 'export CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf' >> /usr/bin/podman && \
     echo 'export CONTAINERS_REGISTRIES_CONF=/etc/containers/registries.conf' >> /usr/bin/podman && \
-    echo '# Initialize cgroup filesystem if needed' >> /usr/bin/podman && \
-    echo 'if [ ! -d /sys/fs/cgroup/systemd ]; then' >> /usr/bin/podman && \
-    echo '    sudo mkdir -p /sys/fs/cgroup/systemd' >> /usr/bin/podman && \
-    echo '    sudo mount -t cgroup -o none,name=systemd systemd /sys/fs/cgroup/systemd 2>/dev/null || true' >> /usr/bin/podman && \
-    echo 'fi' >> /usr/bin/podman && \
-    echo '# Run Podman as root' >> /usr/bin/podman && \
+    echo '# Run Podman as root with systemd cgroup manager' >> /usr/bin/podman && \
     echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
     chmod +x /usr/bin/podman
 
@@ -77,7 +72,7 @@ RUN mkdir -p /etc/containers && \
     echo 'network_backend = "none"' >> /etc/containers/containers.conf && \
     echo '' >> /etc/containers/containers.conf && \
     echo '[engine]' >> /etc/containers/containers.conf && \
-    echo 'cgroup_manager = "cgroupfs"' >> /etc/containers/containers.conf && \
+    echo 'cgroup_manager = "systemd"' >> /etc/containers/containers.conf && \
     echo 'events_logger = "file"' >> /etc/containers/containers.conf && \
     echo 'runtime = "crun"' >> /etc/containers/containers.conf
 
@@ -150,7 +145,7 @@ RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'default_network = \"host\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'network_backend = \"none\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'[engine]'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'cgroup_manager = \"cgroupfs\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'cgroup_manager = \"systemd\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'runtime = \"crun\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system reset --force 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system migrate 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
@@ -165,6 +160,8 @@ RUN echo '#!/bin/bash' > /home/coder/test-rootful.sh && \
     echo 'export CONTAINERS_REGISTRIES_CONF=/etc/containers/registries.conf' >> /home/coder/test-rootful.sh && \
     echo 'echo "Running: sudo /usr/bin/podman-original info --format \"{{.Store.RunRoot}}\""' >> /home/coder/test-rootful.sh && \
     echo 'sudo /usr/bin/podman-original info --format "{{.Store.RunRoot}}" 2>/dev/null || echo "Failed to get storage info"' >> /home/coder/test-rootful.sh && \
+    echo 'echo "Cgroup manager:"' >> /home/coder/test-rootful.sh && \
+    echo 'sudo /usr/bin/podman-original info --format "{{.Host.CgroupManager}}" 2>/dev/null || echo "Failed to get cgroup manager"' >> /home/coder/test-rootful.sh && \
     chmod +x /home/coder/test-rootful.sh
 
 # Verify Podman installation and wrapper
