@@ -16,8 +16,6 @@ RUN dnf update -y && \
         podman \
         crun \
         fuse-overlayfs \
-        netavark \
-        aardvark-dns \
         curl \
         git \
         sudo \
@@ -34,72 +32,91 @@ RUN echo "coder:100000:65536" >> /etc/subuid && \
 # Configure sudo for coder user (needed for some operations)
 RUN echo "coder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-# Create necessary directories for Podman
-RUN mkdir -p /home/coder/.config/containers && \
-    mkdir -p /home/coder/.local/share/containers/{storage,runroot} && \
-    mkdir -p /var/lib/containers/storage && \
-    mkdir -p /run/containers/storage && \
-    chmod 755 /var/lib/containers && \
-    chmod 755 /run/containers
+# Create Podman configuration script (runtime configuration like the working template)
+RUN cat > /usr/local/bin/setup-podman.sh << 'EOF'
+#!/bin/bash
+set -e
 
-# Configure Podman for container-in-container compatibility
-RUN echo '[containers]' > /home/coder/.config/containers/containers.conf && \
-    echo '# Run containers in the same user namespace as Podman itself' >> /home/coder/.config/containers/containers.conf && \
-    echo 'userns = "host"' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Use host networking to avoid network namespace issues' >> /home/coder/.config/containers/containers.conf && \
-    echo 'netns = "host"' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Disable security profiles for container-in-container compatibility' >> /home/coder/.config/containers/containers.conf && \
-    echo 'seccomp_profile = ""' >> /home/coder/.config/containers/containers.conf && \
-    echo 'apparmor_profile = ""' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Default security options' >> /home/coder/.config/containers/containers.conf && \
-    echo 'default_sysctls = []' >> /home/coder/.config/containers/containers.conf && \
-    echo '' >> /home/coder/.config/containers/containers.conf && \
-    echo '[network]' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Disable CNI networking to avoid bridge creation issues' >> /home/coder/.config/containers/containers.conf && \
-    echo 'network_backend = "netavark"' >> /home/coder/.config/containers/containers.conf && \
-    echo 'default_network = "none"' >> /home/coder/.config/containers/containers.conf && \
-    echo '' >> /home/coder/.config/containers/containers.conf && \
-    echo '[engine]' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Engine configuration for container environments' >> /home/coder/.config/containers/containers.conf && \
-    echo 'cgroup_manager = "cgroupfs"' >> /home/coder/.config/containers/containers.conf && \
-    echo 'events_logger = "file"' >> /home/coder/.config/containers/containers.conf && \
-    echo 'runtime = "crun"' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Runtime options' >> /home/coder/.config/containers/containers.conf && \
-    echo 'runtime_supports_json = ["crun"]' >> /home/coder/.config/containers/containers.conf
+echo "🐳 Configuring Podman for Kubernetes environment..."
+
+# Create podman configuration directory
+mkdir -p /home/coder/.config/containers
+
+# Configure Podman for KIND compatibility
+cat > /home/coder/.config/containers/containers.conf << 'PODMAN_CONF'
+[containers]
+# Disable user namespaces for KIND compatibility
+userns = ""
+# Use host networking by default to avoid network namespace issues
+netns = "host"
+# Disable seccomp and apparmor for KIND compatibility
+seccomp_profile = ""
+apparmor_profile = ""
+# Add default security options for container execution
+default_sysctls = []
+
+[engine]
+# Disable some features that may not work in KIND
+cgroup_manager = "cgroupfs"
+events_logger = "file"
+runtime = "crun"
+# Add default runtime options for easier container execution in KIND
+runtime_supports_json = ["crun"]
+PODMAN_CONF
 
 # Configure registries for Podman
-RUN echo '[registries.search]' > /home/coder/.config/containers/registries.conf && \
-    echo "registries = ['docker.io', 'quay.io', 'registry.redhat.io']" >> /home/coder/.config/containers/registries.conf && \
-    echo '' >> /home/coder/.config/containers/registries.conf && \
-    echo '[registries.insecure]' >> /home/coder/.config/containers/registries.conf && \
-    echo 'registries = []' >> /home/coder/.config/containers/registries.conf && \
-    echo '' >> /home/coder/.config/containers/registries.conf && \
-    echo '[registries.block]' >> /home/coder/.config/containers/registries.conf && \
-    echo 'registries = []' >> /home/coder/.config/containers/registries.conf
+cat > /home/coder/.config/containers/registries.conf << 'REG_CONF'
+[registries.search]
+registries = ['docker.io', 'quay.io']
 
-# Configure storage for Podman (use system-wide storage to avoid overlay issues)
-RUN echo '[storage]' > /home/coder/.config/containers/storage.conf && \
-    echo 'driver = "overlay"' >> /home/coder/.config/containers/storage.conf && \
-    echo 'runroot = "/run/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
-    echo 'graphroot = "/var/lib/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
-    echo '' >> /home/coder/.config/containers/storage.conf && \
-    echo '[storage.options]' >> /home/coder/.config/containers/storage.conf && \
-    echo '# Use overlay driver with system paths' >> /home/coder/.config/containers/storage.conf && \
-    echo '[storage.options.overlay]' >> /home/coder/.config/containers/storage.conf && \
-    echo 'mount_program = "/usr/bin/fuse-overlayfs"' >> /home/coder/.config/containers/storage.conf
+[registries.insecure]
+registries = []
 
-# Set proper ownership for all coder user files
-RUN chown -R coder:coder /home/coder/.config && \
-    chown -R coder:coder /home/coder/.local
+[registries.block]
+registries = []
+REG_CONF
+
+# Configure storage for Podman (KIND-compatible configuration)
+cat > /home/coder/.config/containers/storage.conf << 'STORAGE_CONF'
+[storage]
+driver = "vfs"
+runroot = "/home/coder/.local/share/containers/runroot"
+graphroot = "/home/coder/.local/share/containers/storage"
+
+[storage.options]
+# Use VFS driver for KIND compatibility (slower but more reliable)
+STORAGE_CONF
+
+# Create necessary directories and set ownership
+mkdir -p /home/coder/.local/share/containers/{storage,runroot}
+chown -R coder:coder /home/coder/.config
+chown -R coder:coder /home/coder/.local
+
+# Reset Podman storage to ensure clean state (like the working template)
+echo "🔧 Resetting Podman storage for clean initialization..."
+rm -rf /home/coder/.local/share/containers/storage
+mkdir -p /home/coder/.local/share/containers/{storage,runroot}
+chown -R coder:coder /home/coder/.local
+
+echo "✅ Podman configuration completed"
+EOF
+
+RUN chmod +x /usr/local/bin/setup-podman.sh
 
 # Set environment variables for Podman
 ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot"
 
-# Create a wrapper script for Podman to run as root by default
+# Create a wrapper script for Podman that ensures proper setup
 RUN mv /usr/bin/podman /usr/bin/podman-original && \
-    echo '#!/bin/bash' > /usr/bin/podman && \
-    echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
-    chmod +x /usr/bin/podman
+    cat > /usr/bin/podman << 'WRAPPER_EOF'
+#!/bin/bash
+# Ensure Podman is configured before first use
+if [ ! -f /home/coder/.config/containers/containers.conf ]; then
+    /usr/local/bin/setup-podman.sh
+fi
+exec sudo /usr/bin/podman-original "$@"
+WRAPPER_EOF
+RUN chmod +x /usr/bin/podman
 
 # Switch to coder user
 USER coder
