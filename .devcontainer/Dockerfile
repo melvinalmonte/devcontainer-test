@@ -36,49 +36,43 @@ RUN mkdir -p /home/coder/.config/containers && \
     mkdir -p /home/coder/.local/share/containers/{storage,runroot}
 
 # Configure Podman for KIND/container compatibility
-RUN cat > /home/coder/.config/containers/containers.conf << EOF
-[containers]
-# Disable user namespaces for KIND compatibility
-userns = ""
-# Use host networking by default to avoid network namespace issues
-netns = "host"
-# Disable seccomp and apparmor for KIND compatibility
-seccomp_profile = ""
-apparmor_profile = ""
-# Add default security options for container execution
-default_sysctls = []
-
-[engine]
-# Disable some features that may not work in KIND
-cgroup_manager = "cgroupfs"
-events_logger = "file"
-runtime = "crun"
-# Add default runtime options for easier container execution in KIND
-runtime_supports_json = ["crun"]
-EOF
+RUN echo '[containers]' > /home/coder/.config/containers/containers.conf && \
+    echo '# Disable user namespaces for KIND compatibility' >> /home/coder/.config/containers/containers.conf && \
+    echo 'userns = ""' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Use host networking by default to avoid network namespace issues' >> /home/coder/.config/containers/containers.conf && \
+    echo 'netns = "host"' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Disable seccomp and apparmor for KIND compatibility' >> /home/coder/.config/containers/containers.conf && \
+    echo 'seccomp_profile = ""' >> /home/coder/.config/containers/containers.conf && \
+    echo 'apparmor_profile = ""' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Add default security options for container execution' >> /home/coder/.config/containers/containers.conf && \
+    echo 'default_sysctls = []' >> /home/coder/.config/containers/containers.conf && \
+    echo '' >> /home/coder/.config/containers/containers.conf && \
+    echo '[engine]' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Disable some features that may not work in KIND' >> /home/coder/.config/containers/containers.conf && \
+    echo 'cgroup_manager = "cgroupfs"' >> /home/coder/.config/containers/containers.conf && \
+    echo 'events_logger = "file"' >> /home/coder/.config/containers/containers.conf && \
+    echo 'runtime = "crun"' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Add default runtime options for easier container execution in KIND' >> /home/coder/.config/containers/containers.conf && \
+    echo 'runtime_supports_json = ["crun"]' >> /home/coder/.config/containers/containers.conf
 
 # Configure registries for Podman
-RUN cat > /home/coder/.config/containers/registries.conf << EOF
-[registries.search]
-registries = ['docker.io', 'quay.io', 'registry.redhat.io']
-
-[registries.insecure]
-registries = []
-
-[registries.block]
-registries = []
-EOF
+RUN echo '[registries.search]' > /home/coder/.config/containers/registries.conf && \
+    echo "registries = ['docker.io', 'quay.io', 'registry.redhat.io']" >> /home/coder/.config/containers/registries.conf && \
+    echo '' >> /home/coder/.config/containers/registries.conf && \
+    echo '[registries.insecure]' >> /home/coder/.config/containers/registries.conf && \
+    echo 'registries = []' >> /home/coder/.config/containers/registries.conf && \
+    echo '' >> /home/coder/.config/containers/registries.conf && \
+    echo '[registries.block]' >> /home/coder/.config/containers/registries.conf && \
+    echo 'registries = []' >> /home/coder/.config/containers/registries.conf
 
 # Configure storage for Podman (KIND-compatible configuration)
-RUN cat > /home/coder/.config/containers/storage.conf << EOF
-[storage]
-driver = "vfs"
-runroot = "/home/coder/.local/share/containers/runroot"
-graphroot = "/home/coder/.local/share/containers/storage"
-
-[storage.options]
-# Use VFS driver for KIND compatibility (slower but more reliable)
-EOF
+RUN echo '[storage]' > /home/coder/.config/containers/storage.conf && \
+    echo 'driver = "vfs"' >> /home/coder/.config/containers/storage.conf && \
+    echo 'runroot = "/home/coder/.local/share/containers/runroot"' >> /home/coder/.config/containers/storage.conf && \
+    echo 'graphroot = "/home/coder/.local/share/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
+    echo '' >> /home/coder/.config/containers/storage.conf && \
+    echo '[storage.options]' >> /home/coder/.config/containers/storage.conf && \
+    echo '# Use VFS driver for KIND compatibility (slower but more reliable)' >> /home/coder/.config/containers/storage.conf
 
 # Set proper ownership for all coder user files
 RUN chown -R coder:coder /home/coder/.config && \
