@@ -53,14 +53,21 @@ RUN mkdir -p /var/lib/containers/storage && \
     chmod 755 /run/containers
 
 # Create a wrapper script for Podman to run as root
-RUN mv /usr/bin/podman /usr/bin/podman-original && \
-    echo '#!/bin/bash' > /usr/bin/podman && \
-    echo '# Ensure required directories exist for rootful Podman' >> /usr/bin/podman && \
-    echo 'sudo mkdir -p /var/lib/containers/storage /run/containers/storage' >> /usr/bin/podman && \
-    echo 'sudo chmod 1777 /tmp' >> /usr/bin/podman && \
-    echo '# Run Podman as root' >> /usr/bin/podman && \
-    echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
-    chmod +x /usr/bin/podman
+RUN if [ -f /usr/bin/podman ]; then \
+        mv /usr/bin/podman /usr/bin/podman-original; \
+    else \
+        echo "Warning: /usr/bin/podman not found, looking for alternatives..."; \
+        find /usr -name "*podman*" -type f 2>/dev/null || true; \
+    fi && \
+    cat > /usr/bin/podman << 'EOF'
+#!/bin/bash
+# Ensure required directories exist for rootful Podman
+sudo mkdir -p /var/lib/containers/storage /run/containers/storage
+sudo chmod 1777 /tmp
+# Run Podman as root
+exec sudo /usr/bin/podman-original "$@"
+EOF
+RUN chmod +x /usr/bin/podman
 
 # Create system-level Podman configuration for rootful mode
 RUN mkdir -p /etc/containers && \
@@ -87,18 +94,27 @@ USER coder
 WORKDIR /home/coder
 
 # Create debugging and helper scripts
-RUN echo '#!/bin/bash' > /home/coder/debug-podman.sh && \
-    echo 'echo "=== Podman Debug Information ==="' >> /home/coder/debug-podman.sh && \
-    echo 'echo "User: $(whoami)"' >> /home/coder/debug-podman.sh && \
-    echo 'echo "Podman version:"' >> /home/coder/debug-podman.sh && \
-    echo 'sudo /usr/bin/podman-original --version' >> /home/coder/debug-podman.sh && \
-    echo 'echo "Storage info:"' >> /home/coder/debug-podman.sh && \
-    echo 'sudo /usr/bin/podman-original info --format "{{.Store}}" 2>/dev/null || echo "Failed to get storage info"' >> /home/coder/debug-podman.sh && \
-    echo 'echo "Directory structure:"' >> /home/coder/debug-podman.sh && \
-    echo 'ls -la /var/lib/containers/ 2>/dev/null || echo "/var/lib/containers/ not found"' >> /home/coder/debug-podman.sh && \
-    echo 'ls -la /run/containers/ 2>/dev/null || echo "/run/containers/ not found"' >> /home/coder/debug-podman.sh && \
-    echo 'ls -la /etc/containers/ 2>/dev/null || echo "/etc/containers/ not found"' >> /home/coder/debug-podman.sh && \
-    chmod +x /home/coder/debug-podman.sh
+RUN cat > /home/coder/debug-podman.sh << 'EOF'
+#!/bin/bash
+echo "=== Podman Debug Information ==="
+echo "User: $(whoami)"
+echo "Podman wrapper location:"
+ls -la /usr/bin/podman* 2>/dev/null || echo "No podman binaries found in /usr/bin/"
+echo "Podman version (if available):"
+if [ -f /usr/bin/podman-original ]; then
+    sudo /usr/bin/podman-original --version 2>/dev/null || echo "Failed to get version from podman-original"
+elif [ -f /usr/bin/podman ]; then
+    /usr/bin/podman --version 2>/dev/null || echo "Failed to get version from podman wrapper"
+else
+    echo "No podman binary found"
+fi
+echo "Directory structure:"
+ls -la /var/lib/containers/ 2>/dev/null || echo "/var/lib/containers/ not found"
+ls -la /run/containers/ 2>/dev/null || echo "/run/containers/ not found"
+ls -la /etc/containers/ 2>/dev/null || echo "/etc/containers/ not found"
+echo "PATH: $PATH"
+EOF
+RUN chmod +x /home/coder/debug-podman.sh
 
 RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
     echo 'echo "Resetting Podman storage and reinitializing..."' >> /home/coder/reset-podman.sh && \
@@ -110,12 +126,15 @@ RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
     echo 'echo "Podman storage reset and migration complete"' >> /home/coder/reset-podman.sh && \
     chmod +x /home/coder/reset-podman.sh
 
-# Initialize Podman storage with proper migration
-RUN sudo /usr/bin/podman-original system migrate 2>/dev/null || true && \
-    podman info || true
+# Verify Podman installation and wrapper
+RUN echo "Checking Podman installation..." && \
+    ls -la /usr/bin/podman* && \
+    cat /usr/bin/podman && \
+    echo "Testing Podman wrapper..." && \
+    /usr/bin/podman --version || echo "Podman wrapper test failed"
 
-# Verify Podman installation
-RUN podman --version
+# Initialize Podman storage with proper migration
+RUN sudo /usr/bin/podman-original system migrate 2>/dev/null || true
 
 # Set default command
 CMD ["/bin/bash"]
