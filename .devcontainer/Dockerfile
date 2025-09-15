@@ -16,6 +16,8 @@ RUN dnf update -y && \
         podman \
         crun \
         fuse-overlayfs \
+        netavark \
+        aardvark-dns \
         curl \
         git \
         sudo \
@@ -34,7 +36,11 @@ RUN echo "coder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 # Create necessary directories for Podman
 RUN mkdir -p /home/coder/.config/containers && \
-    mkdir -p /home/coder/.local/share/containers/{storage,runroot}
+    mkdir -p /home/coder/.local/share/containers/{storage,runroot} && \
+    mkdir -p /var/lib/containers/storage && \
+    mkdir -p /run/containers/storage && \
+    chmod 755 /var/lib/containers && \
+    chmod 755 /run/containers
 
 # Configure Podman for container-in-container compatibility
 RUN echo '[containers]' > /home/coder/.config/containers/containers.conf && \
@@ -47,6 +53,11 @@ RUN echo '[containers]' > /home/coder/.config/containers/containers.conf && \
     echo 'apparmor_profile = ""' >> /home/coder/.config/containers/containers.conf && \
     echo '# Default security options' >> /home/coder/.config/containers/containers.conf && \
     echo 'default_sysctls = []' >> /home/coder/.config/containers/containers.conf && \
+    echo '' >> /home/coder/.config/containers/containers.conf && \
+    echo '[network]' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Disable CNI networking to avoid bridge creation issues' >> /home/coder/.config/containers/containers.conf && \
+    echo 'network_backend = "netavark"' >> /home/coder/.config/containers/containers.conf && \
+    echo 'default_network = "none"' >> /home/coder/.config/containers/containers.conf && \
     echo '' >> /home/coder/.config/containers/containers.conf && \
     echo '[engine]' >> /home/coder/.config/containers/containers.conf && \
     echo '# Engine configuration for container environments' >> /home/coder/.config/containers/containers.conf && \
@@ -66,14 +77,16 @@ RUN echo '[registries.search]' > /home/coder/.config/containers/registries.conf 
     echo '[registries.block]' >> /home/coder/.config/containers/registries.conf && \
     echo 'registries = []' >> /home/coder/.config/containers/registries.conf
 
-# Configure storage for Podman (KIND-compatible configuration)
+# Configure storage for Podman (use system-wide storage to avoid overlay issues)
 RUN echo '[storage]' > /home/coder/.config/containers/storage.conf && \
-    echo 'driver = "vfs"' >> /home/coder/.config/containers/storage.conf && \
-    echo 'runroot = "/home/coder/.local/share/containers/runroot"' >> /home/coder/.config/containers/storage.conf && \
-    echo 'graphroot = "/home/coder/.local/share/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
+    echo 'driver = "overlay"' >> /home/coder/.config/containers/storage.conf && \
+    echo 'runroot = "/run/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
+    echo 'graphroot = "/var/lib/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
     echo '' >> /home/coder/.config/containers/storage.conf && \
     echo '[storage.options]' >> /home/coder/.config/containers/storage.conf && \
-    echo '# Use VFS driver for KIND compatibility (slower but more reliable)' >> /home/coder/.config/containers/storage.conf
+    echo '# Use overlay driver with system paths' >> /home/coder/.config/containers/storage.conf && \
+    echo '[storage.options.overlay]' >> /home/coder/.config/containers/storage.conf && \
+    echo 'mount_program = "/usr/bin/fuse-overlayfs"' >> /home/coder/.config/containers/storage.conf
 
 # Set proper ownership for all coder user files
 RUN chown -R coder:coder /home/coder/.config && \
