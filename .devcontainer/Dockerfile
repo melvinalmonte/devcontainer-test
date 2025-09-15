@@ -38,8 +38,8 @@ RUN mkdir -p /home/coder/.config/containers && \
 
 # Configure Podman for container-in-container compatibility
 RUN echo '[containers]' > /home/coder/.config/containers/containers.conf && \
-    echo '# Run containers in the same user namespace as Podman itself' >> /home/coder/.config/containers/containers.conf && \
-    echo 'userns = "host"' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Force rootful mode to avoid user namespace issues in KIND' >> /home/coder/.config/containers/containers.conf && \
+    echo 'userns = ""' >> /home/coder/.config/containers/containers.conf && \
     echo '# Use host networking to avoid network namespace issues' >> /home/coder/.config/containers/containers.conf && \
     echo 'netns = "host"' >> /home/coder/.config/containers/containers.conf && \
     echo '# Disable security profiles for container-in-container compatibility' >> /home/coder/.config/containers/containers.conf && \
@@ -90,6 +90,12 @@ ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot"
 # Remove any existing Podman system configuration that might conflict
 RUN rm -rf /etc/containers/* || true
 
+# Create a wrapper script for Podman to run as root
+RUN mv /usr/bin/podman /usr/bin/podman-original && \
+    echo '#!/bin/bash' > /usr/bin/podman && \
+    echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
+    chmod +x /usr/bin/podman
+
 # Switch to coder user
 USER coder
 WORKDIR /home/coder
@@ -97,9 +103,10 @@ WORKDIR /home/coder
 # Create a helper script to reset Podman storage if needed
 RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
     echo 'echo "Resetting Podman storage..."' >> /home/coder/reset-podman.sh && \
-    echo 'rm -rf ~/.local/share/containers/storage/*' >> /home/coder/reset-podman.sh && \
-    echo 'rm -rf ~/.local/share/containers/runroot/*' >> /home/coder/reset-podman.sh && \
-    echo 'podman system reset --force' >> /home/coder/reset-podman.sh && \
+    echo 'sudo rm -rf /var/lib/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
+    echo 'rm -rf ~/.local/share/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
+    echo 'rm -rf ~/.local/share/containers/runroot/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
+    echo 'sudo podman system reset --force 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'echo "Podman storage reset complete"' >> /home/coder/reset-podman.sh && \
     chmod +x /home/coder/reset-podman.sh
 
