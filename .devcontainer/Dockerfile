@@ -60,9 +60,13 @@ RUN echo '#!/bin/bash' > /usr/local/bin/setup-podman.sh && \
     echo 'echo "driver = \"overlay\"" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
     echo 'echo "runroot = \"/home/coder/.local/share/containers/runroot\"" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
     echo 'echo "graphroot = \"/home/coder/.local/share/containers/storage\"" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "[storage.options]" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'mkdir -p /home/coder/.local/share/containers/{storage,runroot}' >> /usr/local/bin/setup-podman.sh && \
+    echo '' >> /home/coder/.config/containers/storage.conf && \
+    echo '[storage.options.additionalimagestores]' >> /home/coder/.config/containers/storage.conf && \
+    echo 'additionalimagestores = []' >> /home/coder/.config/containers/storage.conf && \
+    echo '' >> /home/coder/.config/containers/storage.conf && \
+    echo '[storage.options.rootless_storage_path]' >> /home/coder/.config/containers/storage.conf && \
+    echo 'rootless_storage_path = "/home/coder/.local/share/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
+    echo '' >> /home/coder/.config/containers/storage.conf && \
     echo 'chown -R coder:coder /home/coder/.config' >> /usr/local/bin/setup-podman.sh && \
     echo 'chown -R coder:coder /home/coder/.local' >> /usr/local/bin/setup-podman.sh && \
     echo 'rm -rf /home/coder/.local/share/containers/storage' >> /usr/local/bin/setup-podman.sh && \
