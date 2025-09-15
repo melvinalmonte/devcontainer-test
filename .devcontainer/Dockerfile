@@ -43,23 +43,23 @@ RUN echo '#!/bin/bash' > /usr/local/bin/setup-podman.sh && \
     echo 'echo "apparmor_profile = \"\"" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
     echo 'echo "default_sysctls = []" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
     echo 'echo "" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "[engine]" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "cgroup_manager = \"cgroupfs\"" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "events_logger = \"file\"" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "runtime = \"crun\"" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "runtime_supports_json = [\"crun\"]" >> /home/coder/.config/containers/containers.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "[registries.search]" > /home/coder/.config/containers/registries.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "registries = ['"'"'docker.io'"'"', '"'"'quay.io'"'"']" >> /home/coder/.config/containers/registries.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "" >> /home/coder/.config/containers/registries.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "[registries.insecure]" >> /home/coder/.config/containers/registries.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "registries = []" >> /home/coder/.config/containers/registries.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "" >> /home/coder/.config/containers/registries.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "[registries.block]" >> /home/coder/.config/containers/registries.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "registries = []" >> /home/coder/.config/containers/registries.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "[storage]" > /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "driver = \"overlay\"" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "runroot = \"/home/coder/.local/share/containers/runroot\"" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "graphroot = \"/home/coder/.local/share/containers/storage\"" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
+    echo '[engine]' >> /home/coder/.config/containers/containers.conf && \
+    echo 'cgroup_manager = "cgroupfs"' >> /home/coder/.config/containers/containers.conf && \
+    echo 'events_logger = "file"' >> /home/coder/.config/containers/containers.conf && \
+    echo 'runtime = "crun"' >> /home/coder/.config/containers/containers.conf && \
+    echo 'runtime_supports_json = ["crun"]' >> /home/coder/.config/containers/containers.conf && \
+    echo '[registries.search]' >> /home/coder/.config/containers/registries.conf && \
+    echo 'registries = ["docker.io", "quay.io"]' >> /home/coder/.config/containers/registries.conf && \
+    echo '' >> /home/coder/.config/containers/registries.conf && \
+    echo '[registries.insecure]' >> /home/coder/.config/containers/registries.conf && \
+    echo 'registries = []' >> /home/coder/.config/containers/registries.conf && \
+    echo '' >> /home/coder/.config/containers/registries.conf && \
+    echo '[registries.block]' >> /home/coder/.config/containers/registries.conf && \
+    echo 'registries = []' >> /home/coder/.config/containers/registries.conf && \
+    echo '[storage]' >> /home/coder/.config/containers/storage.conf && \
+    echo 'driver = "overlay"' >> /home/coder/.config/containers/storage.conf && \
+    echo 'runroot = "/home/coder/.local/share/containers/runroot"' >> /home/coder/.config/containers/storage.conf && \
+    echo 'graphroot = "/home/coder/.local/share/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
     echo '' >> /home/coder/.config/containers/storage.conf && \
     echo '[storage.options.additionalimagestores]' >> /home/coder/.config/containers/storage.conf && \
     echo 'additionalimagestores = []' >> /home/coder/.config/containers/storage.conf && \
@@ -76,6 +76,7 @@ RUN echo '#!/bin/bash' > /usr/local/bin/setup-podman.sh && \
     chmod +x /usr/local/bin/setup-podman.sh
 
 # Set environment variables for Podman
+ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot"
 
 # Switch to coder user
