@@ -7,7 +7,8 @@ LABEL maintainer="Coder Template" \
       version="1.0"
 
 # Create coder user with proper UID/GID for Kubernetes
-RUN useradd -m -u 1000 -g 1000 -s /bin/bash coder
+RUN groupadd -g 1000 coder && \
+    useradd -m -u 1000 -g 1000 -s /bin/bash coder
 
 # Install required packages
 RUN dnf update -y && \
