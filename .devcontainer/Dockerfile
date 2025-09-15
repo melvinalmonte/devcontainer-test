@@ -85,14 +85,29 @@ RUN chown -R coder:coder /home/coder/.config && \
     chown -R coder:coder /home/coder/.local
 
 # Set environment variables for Podman
-ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot"
+ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot" \
+    TMPDIR="/tmp" \
+    CONTAINERS_CONF="/home/coder/.config/containers/containers.conf" \
+    CONTAINERS_STORAGE_CONF="/home/coder/.config/containers/storage.conf"
 
 # Remove any existing Podman system configuration that might conflict
 RUN rm -rf /etc/containers/* || true
 
+# Create necessary system directories for Podman
+RUN mkdir -p /var/lib/containers/storage && \
+    mkdir -p /run/containers && \
+    mkdir -p /tmp/libpod && \
+    chmod 1777 /tmp && \
+    chmod 755 /var/lib/containers && \
+    chmod 755 /run/containers
+
 # Create a wrapper script for Podman to run as root
 RUN mv /usr/bin/podman /usr/bin/podman-original && \
     echo '#!/bin/bash' > /usr/bin/podman && \
+    echo '# Ensure required directories exist' >> /usr/bin/podman && \
+    echo 'sudo mkdir -p /var/lib/containers/storage /run/containers /tmp/libpod' >> /usr/bin/podman && \
+    echo 'sudo chmod 1777 /tmp' >> /usr/bin/podman && \
+    echo '# Run Podman as root' >> /usr/bin/podman && \
     echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
     chmod +x /usr/bin/podman
 
@@ -102,16 +117,20 @@ WORKDIR /home/coder
 
 # Create a helper script to reset Podman storage if needed
 RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
-    echo 'echo "Resetting Podman storage..."' >> /home/coder/reset-podman.sh && \
+    echo 'echo "Resetting Podman storage and reinitializing..."' >> /home/coder/reset-podman.sh && \
     echo 'sudo rm -rf /var/lib/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'rm -rf ~/.local/share/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'rm -rf ~/.local/share/containers/runroot/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
-    echo 'sudo podman system reset --force 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
-    echo 'echo "Podman storage reset complete"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo mkdir -p /var/lib/containers/storage /run/containers /tmp/libpod' >> /home/coder/reset-podman.sh && \
+    echo 'sudo chmod 1777 /tmp' >> /home/coder/reset-podman.sh && \
+    echo 'sudo /usr/bin/podman-original system reset --force 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
+    echo 'sudo /usr/bin/podman-original system migrate 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
+    echo 'echo "Podman storage reset and migration complete"' >> /home/coder/reset-podman.sh && \
     chmod +x /home/coder/reset-podman.sh
 
-# Initialize Podman storage with the VFS driver
-RUN podman info || true
+# Initialize Podman storage with proper migration
+RUN sudo /usr/bin/podman-original system migrate 2>/dev/null || true && \
+    podman info || true
 
 # Verify Podman installation
 RUN podman --version
