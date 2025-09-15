@@ -72,7 +72,7 @@ RUN mkdir -p /etc/containers && \
     echo 'network_backend = "none"' >> /etc/containers/containers.conf && \
     echo '' >> /etc/containers/containers.conf && \
     echo '[engine]' >> /etc/containers/containers.conf && \
-    echo 'cgroup_manager = "systemd"' >> /etc/containers/containers.conf && \
+    echo 'cgroup_manager = "none"' >> /etc/containers/containers.conf && \
     echo 'events_logger = "file"' >> /etc/containers/containers.conf && \
     echo 'runtime = "crun"' >> /etc/containers/containers.conf
 
@@ -145,7 +145,7 @@ RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'default_network = \"host\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'network_backend = \"none\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'[engine]'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'cgroup_manager = \"systemd\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'cgroup_manager = \"none\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'runtime = \"crun\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system reset --force 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system migrate 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
