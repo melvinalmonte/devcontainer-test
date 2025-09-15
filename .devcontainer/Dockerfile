@@ -59,15 +59,13 @@ RUN if [ -f /usr/bin/podman ]; then \
         echo "Warning: /usr/bin/podman not found, looking for alternatives..."; \
         find /usr -name "*podman*" -type f 2>/dev/null || true; \
     fi && \
-    cat > /usr/bin/podman << 'EOF'
-#!/bin/bash
-# Ensure required directories exist for rootful Podman
-sudo mkdir -p /var/lib/containers/storage /run/containers/storage
-sudo chmod 1777 /tmp
-# Run Podman as root
-exec sudo /usr/bin/podman-original "$@"
-EOF
-RUN chmod +x /usr/bin/podman
+    echo '#!/bin/bash' > /usr/bin/podman && \
+    echo '# Ensure required directories exist for rootful Podman' >> /usr/bin/podman && \
+    echo 'sudo mkdir -p /var/lib/containers/storage /run/containers/storage' >> /usr/bin/podman && \
+    echo 'sudo chmod 1777 /tmp' >> /usr/bin/podman && \
+    echo '# Run Podman as root' >> /usr/bin/podman && \
+    echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
+    chmod +x /usr/bin/podman
 
 # Create system-level Podman configuration for rootful mode
 RUN mkdir -p /etc/containers && \
@@ -94,27 +92,25 @@ USER coder
 WORKDIR /home/coder
 
 # Create debugging and helper scripts
-RUN cat > /home/coder/debug-podman.sh << 'EOF'
-#!/bin/bash
-echo "=== Podman Debug Information ==="
-echo "User: $(whoami)"
-echo "Podman wrapper location:"
-ls -la /usr/bin/podman* 2>/dev/null || echo "No podman binaries found in /usr/bin/"
-echo "Podman version (if available):"
-if [ -f /usr/bin/podman-original ]; then
-    sudo /usr/bin/podman-original --version 2>/dev/null || echo "Failed to get version from podman-original"
-elif [ -f /usr/bin/podman ]; then
-    /usr/bin/podman --version 2>/dev/null || echo "Failed to get version from podman wrapper"
-else
-    echo "No podman binary found"
-fi
-echo "Directory structure:"
-ls -la /var/lib/containers/ 2>/dev/null || echo "/var/lib/containers/ not found"
-ls -la /run/containers/ 2>/dev/null || echo "/run/containers/ not found"
-ls -la /etc/containers/ 2>/dev/null || echo "/etc/containers/ not found"
-echo "PATH: $PATH"
-EOF
-RUN chmod +x /home/coder/debug-podman.sh
+RUN echo '#!/bin/bash' > /home/coder/debug-podman.sh && \
+    echo 'echo "=== Podman Debug Information ==="' >> /home/coder/debug-podman.sh && \
+    echo 'echo "User: $(whoami)"' >> /home/coder/debug-podman.sh && \
+    echo 'echo "Podman wrapper location:"' >> /home/coder/debug-podman.sh && \
+    echo 'ls -la /usr/bin/podman* 2>/dev/null || echo "No podman binaries found in /usr/bin/"' >> /home/coder/debug-podman.sh && \
+    echo 'echo "Podman version (if available):"' >> /home/coder/debug-podman.sh && \
+    echo 'if [ -f /usr/bin/podman-original ]; then' >> /home/coder/debug-podman.sh && \
+    echo '    sudo /usr/bin/podman-original --version 2>/dev/null || echo "Failed to get version from podman-original"' >> /home/coder/debug-podman.sh && \
+    echo 'elif [ -f /usr/bin/podman ]; then' >> /home/coder/debug-podman.sh && \
+    echo '    /usr/bin/podman --version 2>/dev/null || echo "Failed to get version from podman wrapper"' >> /home/coder/debug-podman.sh && \
+    echo 'else' >> /home/coder/debug-podman.sh && \
+    echo '    echo "No podman binary found"' >> /home/coder/debug-podman.sh && \
+    echo 'fi' >> /home/coder/debug-podman.sh && \
+    echo 'echo "Directory structure:"' >> /home/coder/debug-podman.sh && \
+    echo 'ls -la /var/lib/containers/ 2>/dev/null || echo "/var/lib/containers/ not found"' >> /home/coder/debug-podman.sh && \
+    echo 'ls -la /run/containers/ 2>/dev/null || echo "/run/containers/ not found"' >> /home/coder/debug-podman.sh && \
+    echo 'ls -la /etc/containers/ 2>/dev/null || echo "/etc/containers/ not found"' >> /home/coder/debug-podman.sh && \
+    echo 'echo "PATH: $PATH"' >> /home/coder/debug-podman.sh && \
+    chmod +x /home/coder/debug-podman.sh
 
 RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
     echo 'echo "Resetting Podman storage and reinitializing..."' >> /home/coder/reset-podman.sh && \
