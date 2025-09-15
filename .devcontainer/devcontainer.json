@@ -8,6 +8,7 @@
     "--cap-add=NET_ADMIN",
     "--cap-add=SETUID",
     "--cap-add=SETGID",
+    "--cap-add=SYS_RESOURCE",
     "--security-opt",
     "seccomp=unconfined",
     "--security-opt",
@@ -17,7 +18,7 @@
     "--tmpfs",
     "/run:exec,suid,size=2g",
     "--tmpfs",
-    "/sys/fs/cgroup:exec,suid,size=100m"
+    "/sys/fs/cgroup:rw,exec,suid,size=100m,mode=755"
   ],
   "containerEnv": {
     "TMPDIR": "/tmp"
