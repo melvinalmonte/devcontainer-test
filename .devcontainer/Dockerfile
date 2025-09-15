@@ -36,24 +36,24 @@ RUN echo "coder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 RUN mkdir -p /home/coder/.config/containers && \
     mkdir -p /home/coder/.local/share/containers/{storage,runroot}
 
-# Configure Podman for KIND/container compatibility
+# Configure Podman for container-in-container compatibility
 RUN echo '[containers]' > /home/coder/.config/containers/containers.conf && \
-    echo '# Disable user namespaces for KIND compatibility' >> /home/coder/.config/containers/containers.conf && \
-    echo 'userns = ""' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Use host networking by default to avoid network namespace issues' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Run containers in the same user namespace as Podman itself' >> /home/coder/.config/containers/containers.conf && \
+    echo 'userns = "host"' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Use host networking to avoid network namespace issues' >> /home/coder/.config/containers/containers.conf && \
     echo 'netns = "host"' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Disable seccomp and apparmor for KIND compatibility' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Disable security profiles for container-in-container compatibility' >> /home/coder/.config/containers/containers.conf && \
     echo 'seccomp_profile = ""' >> /home/coder/.config/containers/containers.conf && \
     echo 'apparmor_profile = ""' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Add default security options for container execution' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Default security options' >> /home/coder/.config/containers/containers.conf && \
     echo 'default_sysctls = []' >> /home/coder/.config/containers/containers.conf && \
     echo '' >> /home/coder/.config/containers/containers.conf && \
     echo '[engine]' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Disable some features that may not work in KIND' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Engine configuration for container environments' >> /home/coder/.config/containers/containers.conf && \
     echo 'cgroup_manager = "cgroupfs"' >> /home/coder/.config/containers/containers.conf && \
     echo 'events_logger = "file"' >> /home/coder/.config/containers/containers.conf && \
     echo 'runtime = "crun"' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Add default runtime options for easier container execution in KIND' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Runtime options' >> /home/coder/.config/containers/containers.conf && \
     echo 'runtime_supports_json = ["crun"]' >> /home/coder/.config/containers/containers.conf
 
 # Configure registries for Podman
@@ -81,6 +81,12 @@ RUN chown -R coder:coder /home/coder/.config && \
 
 # Set environment variables for Podman
 ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot"
+
+# Create a wrapper script for Podman to run as root by default
+RUN mv /usr/bin/podman /usr/bin/podman-original && \
+    echo '#!/bin/bash' > /usr/bin/podman && \
+    echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
+    chmod +x /usr/bin/podman
 
 # Switch to coder user
 USER coder
