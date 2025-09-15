@@ -72,7 +72,7 @@ RUN mkdir -p /etc/containers && \
     echo 'network_backend = "none"' >> /etc/containers/containers.conf && \
     echo '' >> /etc/containers/containers.conf && \
     echo '[engine]' >> /etc/containers/containers.conf && \
-    echo 'cgroup_manager = "cgroupfs"' >> /etc/containers/containers.conf && \
+    echo 'cgroup_manager = "disabled"' >> /etc/containers/containers.conf && \
     echo 'events_logger = "file"' >> /etc/containers/containers.conf && \
     echo 'runtime = "crun"' >> /etc/containers/containers.conf
 
@@ -138,6 +138,15 @@ RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'driver = \"vfs\"'"'"' >> /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'runroot = \"/run/containers/storage\"'"'"' >> /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo sh -c "echo '"'"'graphroot = \"/var/lib/containers/storage\"'"'"' >> /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'echo "Recreating containers.conf with cgroup disabled..."' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'[containers]'"'"' > /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'netns = \"host\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'userns = \"\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'default_network = \"host\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'network_backend = \"none\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'[engine]'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'cgroup_manager = \"disabled\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'runtime = \"crun\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system reset --force 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system migrate 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'echo "Podman storage reset and migration complete"' >> /home/coder/reset-podman.sh && \

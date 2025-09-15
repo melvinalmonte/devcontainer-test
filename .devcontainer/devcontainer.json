@@ -16,8 +16,8 @@
     "/tmp:exec,suid,size=2g",
     "--tmpfs",
     "/run:exec,suid,size=2g",
-    "--volume",
-    "/sys/fs/cgroup:/sys/fs/cgroup:rw"
+    "--tmpfs",
+    "/sys/fs/cgroup:exec,suid,size=100m"
   ],
   "containerEnv": {
     "TMPDIR": "/tmp"
