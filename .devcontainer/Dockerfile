@@ -57,7 +57,7 @@ RUN echo '#!/bin/bash' > /usr/local/bin/setup-podman.sh && \
     echo 'echo "[registries.block]" >> /home/coder/.config/containers/registries.conf' >> /usr/local/bin/setup-podman.sh && \
     echo 'echo "registries = []" >> /home/coder/.config/containers/registries.conf' >> /usr/local/bin/setup-podman.sh && \
     echo 'echo "[storage]" > /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
-    echo 'echo "driver = \"vfs\"" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
+    echo 'echo "driver = \"overlay\"" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
     echo 'echo "runroot = \"/home/coder/.local/share/containers/runroot\"" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
     echo 'echo "graphroot = \"/home/coder/.local/share/containers/storage\"" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
     echo 'echo "" >> /home/coder/.config/containers/storage.conf' >> /usr/local/bin/setup-podman.sh && \
@@ -74,18 +74,12 @@ RUN echo '#!/bin/bash' > /usr/local/bin/setup-podman.sh && \
 # Set environment variables for Podman
 ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot"
 
-# Create a wrapper script for Podman that ensures proper setup
-RUN mv /usr/bin/podman /usr/bin/podman-original && \
-    echo '#!/bin/bash' > /usr/bin/podman && \
-    echo 'if [ ! -f /home/coder/.config/containers/containers.conf ]; then' >> /usr/bin/podman && \
-    echo '    /usr/local/bin/setup-podman.sh' >> /usr/bin/podman && \
-    echo 'fi' >> /usr/bin/podman && \
-    echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
-    chmod +x /usr/bin/podman
-
 # Switch to coder user
 USER coder
 WORKDIR /home/coder
+
+# Run podman setup
+RUN /usr/local/bin/setup-podman.sh
 
 # Verify Podman installation
 RUN podman --version

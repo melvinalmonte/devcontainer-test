@@ -1,5 +1,12 @@
 {
   "build": {
     "dockerfile": "Dockerfile"
-  }
+  },
+  "runArgs": [
+    "--device=/dev/fuse",
+    "--cap-add=SYS_ADMIN",
+    "--cap-add=NET_ADMIN",
+    "--security-opt",
+    "seccomp=unconfined"
+  ]
 }
