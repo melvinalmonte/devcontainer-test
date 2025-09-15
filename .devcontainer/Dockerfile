@@ -42,7 +42,7 @@ RUN mkdir -p /var/lib/containers/storage && \
     chmod 755 /var/lib/containers && \
     chmod 755 /run/containers
 
-# Create a wrapper script for Podman to run as root
+# Create a wrapper script for Podman to run as root with explicit flags
 RUN if [ -f /usr/bin/podman ]; then \
         mv /usr/bin/podman /usr/bin/podman-original; \
     else \
@@ -53,6 +53,10 @@ RUN if [ -f /usr/bin/podman ]; then \
     echo '# Ensure required directories exist for rootful Podman' >> /usr/bin/podman && \
     echo 'sudo mkdir -p /var/lib/containers/storage /run/containers/storage' >> /usr/bin/podman && \
     echo 'sudo chmod 1777 /tmp' >> /usr/bin/podman && \
+    echo '# Force rootful mode with explicit configuration paths' >> /usr/bin/podman && \
+    echo 'export CONTAINERS_CONF=/etc/containers/containers.conf' >> /usr/bin/podman && \
+    echo 'export CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf' >> /usr/bin/podman && \
+    echo 'export CONTAINERS_REGISTRIES_CONF=/etc/containers/registries.conf' >> /usr/bin/podman && \
     echo '# Run Podman as root' >> /usr/bin/podman && \
     echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
     chmod +x /usr/bin/podman
@@ -88,6 +92,10 @@ RUN echo '[registries.search]' > /etc/containers/registries.conf && \
     echo '[registries.block]' >> /etc/containers/registries.conf && \
     echo 'registries = []' >> /etc/containers/registries.conf
 
+# Remove any user-space configuration that might interfere with rootful mode
+RUN rm -rf /home/coder/.config/containers 2>/dev/null || true && \
+    rm -rf /home/coder/.local/share/containers 2>/dev/null || true
+
 # Switch to coder user
 USER coder
 WORKDIR /home/coder
@@ -111,6 +119,13 @@ RUN echo '#!/bin/bash' > /home/coder/debug-podman.sh && \
     echo 'ls -la /run/containers/ 2>/dev/null || echo "/run/containers/ not found"' >> /home/coder/debug-podman.sh && \
     echo 'ls -la /etc/containers/ 2>/dev/null || echo "/etc/containers/ not found"' >> /home/coder/debug-podman.sh && \
     echo 'echo "PATH: $PATH"' >> /home/coder/debug-podman.sh && \
+    echo 'echo "Environment variables:"' >> /home/coder/debug-podman.sh && \
+    echo 'env | grep CONTAINERS || echo "No CONTAINERS env vars"' >> /home/coder/debug-podman.sh && \
+    echo 'echo "Configuration file contents:"' >> /home/coder/debug-podman.sh && \
+    echo 'echo "=== /etc/containers/containers.conf ==="' >> /home/coder/debug-podman.sh && \
+    echo 'cat /etc/containers/containers.conf 2>/dev/null || echo "File not found"' >> /home/coder/debug-podman.sh && \
+    echo 'echo "=== /etc/containers/storage.conf ==="' >> /home/coder/debug-podman.sh && \
+    echo 'cat /etc/containers/storage.conf 2>/dev/null || echo "File not found"' >> /home/coder/debug-podman.sh && \
     chmod +x /home/coder/debug-podman.sh
 
 RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
@@ -127,6 +142,16 @@ RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system migrate 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'echo "Podman storage reset and migration complete"' >> /home/coder/reset-podman.sh && \
     chmod +x /home/coder/reset-podman.sh
+
+# Create a test script to verify rootful mode
+RUN echo '#!/bin/bash' > /home/coder/test-rootful.sh && \
+    echo 'echo "Testing if Podman is running in rootful mode..."' >> /home/coder/test-rootful.sh && \
+    echo 'export CONTAINERS_CONF=/etc/containers/containers.conf' >> /home/coder/test-rootful.sh && \
+    echo 'export CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf' >> /home/coder/test-rootful.sh && \
+    echo 'export CONTAINERS_REGISTRIES_CONF=/etc/containers/registries.conf' >> /home/coder/test-rootful.sh && \
+    echo 'echo "Running: sudo /usr/bin/podman-original info --format \"{{.Store.RunRoot}}\""' >> /home/coder/test-rootful.sh && \
+    echo 'sudo /usr/bin/podman-original info --format "{{.Store.RunRoot}}" 2>/dev/null || echo "Failed to get storage info"' >> /home/coder/test-rootful.sh && \
+    chmod +x /home/coder/test-rootful.sh
 
 # Verify Podman installation and wrapper
 RUN echo "Checking Podman installation..." && \
