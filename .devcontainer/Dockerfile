@@ -32,16 +32,6 @@ RUN echo "coder:100000:65536" >> /etc/subuid && \
 # Configure sudo for coder user (needed for some operations)
 RUN echo "coder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-# Configure registries for system-level Podman
-RUN echo '[registries.search]' > /etc/containers/registries.conf && \
-    echo "registries = ['docker.io', 'quay.io', 'registry.redhat.io']" >> /etc/containers/registries.conf && \
-    echo '' >> /etc/containers/registries.conf && \
-    echo '[registries.insecure]' >> /etc/containers/registries.conf && \
-    echo 'registries = []' >> /etc/containers/registries.conf && \
-    echo '' >> /etc/containers/registries.conf && \
-    echo '[registries.block]' >> /etc/containers/registries.conf && \
-    echo 'registries = []' >> /etc/containers/registries.conf
-
 # Set environment variables for Podman (rootful mode uses system locations)
 ENV TMPDIR="/tmp"
 
@@ -80,12 +70,23 @@ RUN mkdir -p /etc/containers && \
     echo '[engine]' >> /etc/containers/containers.conf && \
     echo 'cgroup_manager = "cgroupfs"' >> /etc/containers/containers.conf && \
     echo 'events_logger = "file"' >> /etc/containers/containers.conf && \
-    echo 'runtime = "crun"' >> /etc/containers/containers.conf && \
-    echo '' >> /etc/containers/containers.conf && \
-    echo '[storage]' >> /etc/containers/storage.conf && \
+    echo 'runtime = "crun"' >> /etc/containers/containers.conf
+
+# Create storage configuration file separately
+RUN echo '[storage]' > /etc/containers/storage.conf && \
     echo 'driver = "vfs"' >> /etc/containers/storage.conf && \
     echo 'runroot = "/run/containers/storage"' >> /etc/containers/storage.conf && \
     echo 'graphroot = "/var/lib/containers/storage"' >> /etc/containers/storage.conf
+
+# Configure registries for system-level Podman
+RUN echo '[registries.search]' > /etc/containers/registries.conf && \
+    echo "registries = ['docker.io', 'quay.io', 'registry.redhat.io']" >> /etc/containers/registries.conf && \
+    echo '' >> /etc/containers/registries.conf && \
+    echo '[registries.insecure]' >> /etc/containers/registries.conf && \
+    echo 'registries = []' >> /etc/containers/registries.conf && \
+    echo '' >> /etc/containers/registries.conf && \
+    echo '[registries.block]' >> /etc/containers/registries.conf && \
+    echo 'registries = []' >> /etc/containers/registries.conf
 
 # Switch to coder user
 USER coder
@@ -113,10 +114,15 @@ RUN echo '#!/bin/bash' > /home/coder/debug-podman.sh && \
     chmod +x /home/coder/debug-podman.sh
 
 RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
-    echo 'echo "Resetting Podman storage and reinitializing..."' >> /home/coder/reset-podman.sh && \
+    echo 'echo "Resetting Podman storage and configuration..."' >> /home/coder/reset-podman.sh && \
     echo 'sudo rm -rf /var/lib/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'sudo rm -rf /run/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'sudo mkdir -p /var/lib/containers/storage /run/containers/storage' >> /home/coder/reset-podman.sh && \
+    echo 'echo "Recreating clean configuration files..."' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'[storage]'"'"' > /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'driver = \"vfs\"'"'"' >> /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'runroot = \"/run/containers/storage\"'"'"' >> /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
+    echo 'sudo sh -c "echo '"'"'graphroot = \"/var/lib/containers/storage\"'"'"' >> /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system reset --force 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system migrate 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'echo "Podman storage reset and migration complete"' >> /home/coder/reset-podman.sh && \
