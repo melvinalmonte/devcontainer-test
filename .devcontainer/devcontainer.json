@@ -6,7 +6,20 @@
     "--device=/dev/fuse",
     "--cap-add=SYS_ADMIN",
     "--cap-add=NET_ADMIN",
+    "--cap-add=SETUID",
+    "--cap-add=SETGID",
     "--security-opt",
-    "seccomp=unconfined"
-  ]
+    "seccomp=unconfined",
+    "--security-opt",
+    "apparmor=unconfined",
+    "--tmpfs",
+    "/tmp:noexec,nosuid,size=2g",
+    "--tmpfs",
+    "/run:noexec,nosuid,size=2g"
+  ],
+  "containerEnv": {
+    "XDG_RUNTIME_DIR": "/home/coder/.local/share/containers/runroot",
+    "CONTAINERS_CONF": "/home/coder/.config/containers/containers.conf",
+    "CONTAINERS_STORAGE_CONF": "/home/coder/.config/containers/storage.conf"
+  }
 }

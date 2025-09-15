@@ -47,6 +47,8 @@ RUN echo '[containers]' > /home/coder/.config/containers/containers.conf && \
     echo 'apparmor_profile = ""' >> /home/coder/.config/containers/containers.conf && \
     echo '# Default security options' >> /home/coder/.config/containers/containers.conf && \
     echo 'default_sysctls = []' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Force host networking for all containers' >> /home/coder/.config/containers/containers.conf && \
+    echo 'default_network = "host"' >> /home/coder/.config/containers/containers.conf && \
     echo '' >> /home/coder/.config/containers/containers.conf && \
     echo '[engine]' >> /home/coder/.config/containers/containers.conf && \
     echo '# Engine configuration for container environments' >> /home/coder/.config/containers/containers.conf && \
@@ -54,7 +56,9 @@ RUN echo '[containers]' > /home/coder/.config/containers/containers.conf && \
     echo 'events_logger = "file"' >> /home/coder/.config/containers/containers.conf && \
     echo 'runtime = "crun"' >> /home/coder/.config/containers/containers.conf && \
     echo '# Runtime options' >> /home/coder/.config/containers/containers.conf && \
-    echo 'runtime_supports_json = ["crun"]' >> /home/coder/.config/containers/containers.conf
+    echo 'runtime_supports_json = ["crun"]' >> /home/coder/.config/containers/containers.conf && \
+    echo '# Disable CNI networking entirely' >> /home/coder/.config/containers/containers.conf && \
+    echo 'network_backend = "none"' >> /home/coder/.config/containers/containers.conf
 
 # Configure registries for Podman
 RUN echo '[registries.search]' > /home/coder/.config/containers/registries.conf && \
@@ -73,7 +77,8 @@ RUN echo '[storage]' > /home/coder/.config/containers/storage.conf && \
     echo 'graphroot = "/home/coder/.local/share/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
     echo '' >> /home/coder/.config/containers/storage.conf && \
     echo '[storage.options]' >> /home/coder/.config/containers/storage.conf && \
-    echo '# Use VFS driver for KIND compatibility (slower but more reliable)' >> /home/coder/.config/containers/storage.conf
+    echo '# Use VFS driver for KIND compatibility (slower but more reliable)' >> /home/coder/.config/containers/storage.conf && \
+    echo '# VFS driver does not require additional mount programs' >> /home/coder/.config/containers/storage.conf
 
 # Set proper ownership for all coder user files
 RUN chown -R coder:coder /home/coder/.config && \
@@ -82,15 +87,24 @@ RUN chown -R coder:coder /home/coder/.config && \
 # Set environment variables for Podman
 ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot"
 
-# Create a wrapper script for Podman to run as root by default
-RUN mv /usr/bin/podman /usr/bin/podman-original && \
-    echo '#!/bin/bash' > /usr/bin/podman && \
-    echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
-    chmod +x /usr/bin/podman
+# Remove any existing Podman system configuration that might conflict
+RUN rm -rf /etc/containers/* || true
 
 # Switch to coder user
 USER coder
 WORKDIR /home/coder
+
+# Create a helper script to reset Podman storage if needed
+RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
+    echo 'echo "Resetting Podman storage..."' >> /home/coder/reset-podman.sh && \
+    echo 'rm -rf ~/.local/share/containers/storage/*' >> /home/coder/reset-podman.sh && \
+    echo 'rm -rf ~/.local/share/containers/runroot/*' >> /home/coder/reset-podman.sh && \
+    echo 'podman system reset --force' >> /home/coder/reset-podman.sh && \
+    echo 'echo "Podman storage reset complete"' >> /home/coder/reset-podman.sh && \
+    chmod +x /home/coder/reset-podman.sh
+
+# Initialize Podman storage with the VFS driver
+RUN podman info || true
 
 # Verify Podman installation
 RUN podman --version
