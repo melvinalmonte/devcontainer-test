@@ -1,83 +1,98 @@
-# Use Ubuntu as base image
-FROM ubuntu:22.04
+# UBI8-based image with rootless Podman for Coder workspaces
+FROM registry.access.redhat.com/ubi8/ubi:latest
 
-# Prevent interactive prompts during package installation
-ENV DEBIAN_FRONTEND=noninteractive
+# Set labels
+LABEL maintainer="Coder Template" \
+      description="UBI8 with rootless Podman for development workspaces" \
+      version="1.0"
 
-# Install essential packages
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    wget \
-    unzip \
-    build-essential \
-    python3 \
-    python3-pip \
-    nodejs \
-    npm \
-    openjdk-17-jdk \
-    && rm -rf /var/lib/apt/lists/*
+# Create coder user with proper UID/GID for Kubernetes
+RUN useradd -m -u 1000 -g 1000 -s /bin/bash coder
 
-# Install Go
-ARG GO_VERSION=1.21.7
-RUN curl -fsSL https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -xzC /usr/local \
-    && ln -s /usr/local/go/bin/go /usr/local/bin/go \
-    && ln -s /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+# Install required packages
+RUN dnf update -y && \
+    dnf install -y \
+        podman \
+        crun \
+        fuse-overlayfs \
+        curl \
+        git \
+        sudo \
+        which \
+        procps-ng \
+        shadow-utils && \
+    dnf clean all
 
-# Create directory for pre-downloaded VS Code extensions
-RUN mkdir -p /opt/vscode-extensions
+# Configure subuid and subgid for rootless operation
+RUN echo "coder:100000:65536" >> /etc/subuid && \
+    echo "coder:100000:65536" >> /etc/subgid && \
+    chmod 644 /etc/subuid /etc/subgid
 
-# Download VS Code extensions and save them in the container
-WORKDIR /opt/vscode-extensions
+# Configure sudo for coder user (needed for some operations)
+RUN echo "coder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-# Python extensions
-RUN curl -L -o python.vsix "https://open-vsx.org/api/ms-python/python/2025.4.0/file/ms-python.python-2025.4.0.vsix"
-RUN curl -L -o pylint.vsix "https://open-vsx.org/api/ms-python/pylint/2024.2.0/file/ms-python.pylint-2024.2.0.vsix"
-RUN curl -L -o black.vsix "https://open-vsx.org/api/ms-python/black-formatter/2024.6.0/file/ms-python.black-formatter-2024.6.0.vsix"
-RUN curl -L -o jupyter.vsix "https://open-vsx.org/api/ms-toolsai/jupyter/2025.7.0/file/ms-toolsai.jupyter-2025.7.0.vsix"
+# Create necessary directories for Podman
+RUN mkdir -p /home/coder/.config/containers && \
+    mkdir -p /home/coder/.local/share/containers/{storage,runroot}
 
-# Java extensions
-RUN curl -L -o java.vsix "https://open-vsx.org/api/redhat/java/1.45.2025081408/file/redhat.java-1.45.2025081408.vsix"
-RUN curl -L -o java-debug.vsix "https://open-vsx.org/api/vscjava/vscode-java-debug/0.58.2/file/vscjava.vscode-java-debug-0.58.2.vsix"
-RUN curl -L -o java-test.vsix "https://open-vsx.org/api/vscjava/vscode-java-test/0.43.1/file/vscjava.vscode-java-test-0.43.1.vsix"
-RUN curl -L -o maven.vsix "https://open-vsx.org/api/vscjava/vscode-maven/0.44.0/file/vscjava.vscode-maven-0.44.0.vsix"
+# Configure Podman for KIND/container compatibility
+RUN cat > /home/coder/.config/containers/containers.conf << 'EOF'
+[containers]
+# Disable user namespaces for KIND compatibility
+userns = ""
+# Use host networking by default to avoid network namespace issues
+netns = "host"
+# Disable seccomp and apparmor for KIND compatibility
+seccomp_profile = ""
+apparmor_profile = ""
+# Add default security options for container execution
+default_sysctls = []
 
-# Go extensions
-RUN curl -L -o go.vsix "https://open-vsx.org/api/golang/Go/0.48.0/file/golang.Go-0.48.0.vsix"
+[engine]
+# Disable some features that may not work in KIND
+cgroup_manager = "cgroupfs"
+events_logger = "file"
+runtime = "crun"
+# Add default runtime options for easier container execution in KIND
+runtime_supports_json = ["crun"]
+EOF
 
-# C# (community build on Open VSX)
-RUN curl -L -o csharp.vsix "https://open-vsx.org/api/muhammad-sammy/csharp/2.84.19/file/muhammad-sammy.csharp-2.84.19.vsix"
-RUN curl -L -o nuget-gallery.vsix "https://open-vsx.org/api/patcx/vscode-nuget-gallery/1.2.4/file/patcx.vscode-nuget-gallery-1.2.4.vsix"
-RUN curl -L -o solution-explorer.vsix "https://open-vsx.org/api/fernandoescolar/vscode-solution-explorer/0.9.1/file/fernandoescolar.vscode-solution-explorer-0.9.1.vsix"
+# Configure registries for Podman
+RUN cat > /home/coder/.config/containers/registries.conf << 'EOF'
+[registries.search]
+registries = ['docker.io', 'quay.io', 'registry.redhat.io']
 
-# General purpose extensions
-RUN curl -L -o terraform.vsix "https://open-vsx.org/api/hashicorp/terraform/web/2.34.5/file/hashicorp.terraform-2.34.5@web.vsix"
-RUN curl -L -o gitlab.vsix "https://open-vsx.org/api/GitLab/gitlab-workflow/6.36.0/file/GitLab.gitlab-workflow-6.36.0.vsix"
-RUN curl -L -o yaml.vsix "https://open-vsx.org/api/redhat/vscode-yaml/1.18.0/file/redhat.vscode-yaml-1.18.0.vsix"
-RUN curl -L -o rest-client.vsix "https://open-vsx.org/api/humao/rest-client/0.25.0/file/humao.rest-client-0.25.0.vsix"
+[registries.insecure]
+registries = []
 
-# Node.js extensions
-RUN curl -L -o eslint.vsix "https://open-vsx.org/api/dbaeumer/vscode-eslint/3.0.16/file/dbaeumer.vscode-eslint-3.0.16.vsix"
-RUN curl -L -o prettier.vsix "https://open-vsx.org/api/esbenp/prettier-vscode/11.0.0/file/esbenp.prettier-vscode-11.0.0.vsix"
-RUN curl -L -o npm-intellisense.vsix "https://open-vsx.org/api/christian-kohler/npm-intellisense/1.4.5/file/christian-kohler.npm-intellisense-1.4.5.vsix"
-RUN curl -L -o path-intellisense.vsix "https://open-vsx.org/api/christian-kohler/path-intellisense/2.8.0/file/christian-kohler.path-intellisense-2.8.0.vsix"
-RUN curl -L -o react-snippets.vsix "https://open-vsx.org/api/dsznajder/es7-react-js-snippets/4.4.3/file/dsznajder.es7-react-js-snippets-4.4.3.vsix"
-RUN curl -L -o tailwindcss.vsix "https://open-vsx.org/api/bradlc/vscode-tailwindcss/0.14.26/file/bradlc.vscode-tailwindcss-0.14.26.vsix"
-RUN curl -L -o angular-ls.vsix "https://open-vsx.org/api/Angular/ng-template/20.2.2/file/Angular.ng-template-20.2.2.vsix"
+[registries.block]
+registries = []
+EOF
 
+# Configure storage for Podman (KIND-compatible configuration)
+RUN cat > /home/coder/.config/containers/storage.conf << 'EOF'
+[storage]
+driver = "vfs"
+runroot = "/home/coder/.local/share/containers/runroot"
+graphroot = "/home/coder/.local/share/containers/storage"
 
-# Verify downloaded extensions exist
-RUN ls -la /opt/vscode-extensions/
+[storage.options]
+# Use VFS driver for KIND compatibility (slower but more reliable)
+EOF
 
-# Set workspace folder
-WORKDIR /workspace
+# Set proper ownership for all coder user files
+RUN chown -R coder:coder /home/coder/.config && \
+    chown -R coder:coder /home/coder/.local
 
-# Add Go to PATH
-ENV PATH="/usr/local/go/bin:${PATH}"
+# Set environment variables for Podman
+ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot"
 
-# Create a non-root user (following security best practices)
-RUN groupadd --gid 1000 vscode \
-    && useradd --uid 1000 --gid 1000 -m vscode \
-    && chown -R vscode:vscode /opt/vscode-extensions
+# Switch to coder user
+USER coder
+WORKDIR /home/coder
 
-USER vscode
+# Verify Podman installation
+RUN podman --version
+
+# Set default command
+CMD ["/bin/bash"]
