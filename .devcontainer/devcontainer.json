@@ -20,8 +20,6 @@
     "/sys/fs/cgroup:/sys/fs/cgroup:rw"
   ],
   "containerEnv": {
-    "XDG_RUNTIME_DIR": "/home/coder/.local/share/containers/runroot",
-    "CONTAINERS_CONF": "/home/coder/.config/containers/containers.conf",
-    "CONTAINERS_STORAGE_CONF": "/home/coder/.config/containers/storage.conf"
+    "TMPDIR": "/tmp"
   }
 }

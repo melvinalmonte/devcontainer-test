@@ -32,71 +32,22 @@ RUN echo "coder:100000:65536" >> /etc/subuid && \
 # Configure sudo for coder user (needed for some operations)
 RUN echo "coder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-# Create necessary directories for Podman
-RUN mkdir -p /home/coder/.config/containers && \
-    mkdir -p /home/coder/.local/share/containers/{storage,runroot}
+# Configure registries for system-level Podman
+RUN echo '[registries.search]' > /etc/containers/registries.conf && \
+    echo "registries = ['docker.io', 'quay.io', 'registry.redhat.io']" >> /etc/containers/registries.conf && \
+    echo '' >> /etc/containers/registries.conf && \
+    echo '[registries.insecure]' >> /etc/containers/registries.conf && \
+    echo 'registries = []' >> /etc/containers/registries.conf && \
+    echo '' >> /etc/containers/registries.conf && \
+    echo '[registries.block]' >> /etc/containers/registries.conf && \
+    echo 'registries = []' >> /etc/containers/registries.conf
 
-# Configure Podman for container-in-container compatibility
-RUN echo '[containers]' > /home/coder/.config/containers/containers.conf && \
-    echo '# Force rootful mode to avoid user namespace issues in KIND' >> /home/coder/.config/containers/containers.conf && \
-    echo 'userns = ""' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Use host networking to avoid network namespace issues' >> /home/coder/.config/containers/containers.conf && \
-    echo 'netns = "host"' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Disable security profiles for container-in-container compatibility' >> /home/coder/.config/containers/containers.conf && \
-    echo 'seccomp_profile = ""' >> /home/coder/.config/containers/containers.conf && \
-    echo 'apparmor_profile = ""' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Default security options' >> /home/coder/.config/containers/containers.conf && \
-    echo 'default_sysctls = []' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Force host networking for all containers' >> /home/coder/.config/containers/containers.conf && \
-    echo 'default_network = "host"' >> /home/coder/.config/containers/containers.conf && \
-    echo '' >> /home/coder/.config/containers/containers.conf && \
-    echo '[engine]' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Engine configuration for container environments' >> /home/coder/.config/containers/containers.conf && \
-    echo 'cgroup_manager = "cgroupfs"' >> /home/coder/.config/containers/containers.conf && \
-    echo 'events_logger = "file"' >> /home/coder/.config/containers/containers.conf && \
-    echo 'runtime = "crun"' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Runtime options' >> /home/coder/.config/containers/containers.conf && \
-    echo 'runtime_supports_json = ["crun"]' >> /home/coder/.config/containers/containers.conf && \
-    echo '# Disable CNI networking entirely' >> /home/coder/.config/containers/containers.conf && \
-    echo 'network_backend = "none"' >> /home/coder/.config/containers/containers.conf
-
-# Configure registries for Podman
-RUN echo '[registries.search]' > /home/coder/.config/containers/registries.conf && \
-    echo "registries = ['docker.io', 'quay.io', 'registry.redhat.io']" >> /home/coder/.config/containers/registries.conf && \
-    echo '' >> /home/coder/.config/containers/registries.conf && \
-    echo '[registries.insecure]' >> /home/coder/.config/containers/registries.conf && \
-    echo 'registries = []' >> /home/coder/.config/containers/registries.conf && \
-    echo '' >> /home/coder/.config/containers/registries.conf && \
-    echo '[registries.block]' >> /home/coder/.config/containers/registries.conf && \
-    echo 'registries = []' >> /home/coder/.config/containers/registries.conf
-
-# Configure storage for Podman (KIND-compatible configuration)
-RUN echo '[storage]' > /home/coder/.config/containers/storage.conf && \
-    echo 'driver = "vfs"' >> /home/coder/.config/containers/storage.conf && \
-    echo 'runroot = "/home/coder/.local/share/containers/runroot"' >> /home/coder/.config/containers/storage.conf && \
-    echo 'graphroot = "/home/coder/.local/share/containers/storage"' >> /home/coder/.config/containers/storage.conf && \
-    echo '' >> /home/coder/.config/containers/storage.conf && \
-    echo '[storage.options]' >> /home/coder/.config/containers/storage.conf && \
-    echo '# Use VFS driver for KIND compatibility (slower but more reliable)' >> /home/coder/.config/containers/storage.conf && \
-    echo '# VFS driver does not require additional mount programs' >> /home/coder/.config/containers/storage.conf
-
-# Set proper ownership for all coder user files
-RUN chown -R coder:coder /home/coder/.config && \
-    chown -R coder:coder /home/coder/.local
-
-# Set environment variables for Podman
-ENV XDG_RUNTIME_DIR="/home/coder/.local/share/containers/runroot" \
-    TMPDIR="/tmp" \
-    CONTAINERS_CONF="/home/coder/.config/containers/containers.conf" \
-    CONTAINERS_STORAGE_CONF="/home/coder/.config/containers/storage.conf"
-
-# Remove any existing Podman system configuration that might conflict
-RUN rm -rf /etc/containers/* || true
+# Set environment variables for Podman (rootful mode uses system locations)
+ENV TMPDIR="/tmp"
 
 # Create necessary system directories for Podman
 RUN mkdir -p /var/lib/containers/storage && \
-    mkdir -p /run/containers && \
-    mkdir -p /tmp/libpod && \
+    mkdir -p /run/containers/storage && \
     chmod 1777 /tmp && \
     chmod 755 /var/lib/containers && \
     chmod 755 /run/containers
@@ -104,25 +55,56 @@ RUN mkdir -p /var/lib/containers/storage && \
 # Create a wrapper script for Podman to run as root
 RUN mv /usr/bin/podman /usr/bin/podman-original && \
     echo '#!/bin/bash' > /usr/bin/podman && \
-    echo '# Ensure required directories exist' >> /usr/bin/podman && \
-    echo 'sudo mkdir -p /var/lib/containers/storage /run/containers /tmp/libpod' >> /usr/bin/podman && \
+    echo '# Ensure required directories exist for rootful Podman' >> /usr/bin/podman && \
+    echo 'sudo mkdir -p /var/lib/containers/storage /run/containers/storage' >> /usr/bin/podman && \
     echo 'sudo chmod 1777 /tmp' >> /usr/bin/podman && \
     echo '# Run Podman as root' >> /usr/bin/podman && \
     echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
     chmod +x /usr/bin/podman
 
+# Create system-level Podman configuration for rootful mode
+RUN mkdir -p /etc/containers && \
+    echo '[containers]' > /etc/containers/containers.conf && \
+    echo 'netns = "host"' >> /etc/containers/containers.conf && \
+    echo 'userns = ""' >> /etc/containers/containers.conf && \
+    echo 'seccomp_profile = ""' >> /etc/containers/containers.conf && \
+    echo 'apparmor_profile = ""' >> /etc/containers/containers.conf && \
+    echo 'default_network = "host"' >> /etc/containers/containers.conf && \
+    echo 'network_backend = "none"' >> /etc/containers/containers.conf && \
+    echo '' >> /etc/containers/containers.conf && \
+    echo '[engine]' >> /etc/containers/containers.conf && \
+    echo 'cgroup_manager = "cgroupfs"' >> /etc/containers/containers.conf && \
+    echo 'events_logger = "file"' >> /etc/containers/containers.conf && \
+    echo 'runtime = "crun"' >> /etc/containers/containers.conf && \
+    echo '' >> /etc/containers/containers.conf && \
+    echo '[storage]' >> /etc/containers/storage.conf && \
+    echo 'driver = "vfs"' >> /etc/containers/storage.conf && \
+    echo 'runroot = "/run/containers/storage"' >> /etc/containers/storage.conf && \
+    echo 'graphroot = "/var/lib/containers/storage"' >> /etc/containers/storage.conf
+
 # Switch to coder user
 USER coder
 WORKDIR /home/coder
 
-# Create a helper script to reset Podman storage if needed
+# Create debugging and helper scripts
+RUN echo '#!/bin/bash' > /home/coder/debug-podman.sh && \
+    echo 'echo "=== Podman Debug Information ==="' >> /home/coder/debug-podman.sh && \
+    echo 'echo "User: $(whoami)"' >> /home/coder/debug-podman.sh && \
+    echo 'echo "Podman version:"' >> /home/coder/debug-podman.sh && \
+    echo 'sudo /usr/bin/podman-original --version' >> /home/coder/debug-podman.sh && \
+    echo 'echo "Storage info:"' >> /home/coder/debug-podman.sh && \
+    echo 'sudo /usr/bin/podman-original info --format "{{.Store}}" 2>/dev/null || echo "Failed to get storage info"' >> /home/coder/debug-podman.sh && \
+    echo 'echo "Directory structure:"' >> /home/coder/debug-podman.sh && \
+    echo 'ls -la /var/lib/containers/ 2>/dev/null || echo "/var/lib/containers/ not found"' >> /home/coder/debug-podman.sh && \
+    echo 'ls -la /run/containers/ 2>/dev/null || echo "/run/containers/ not found"' >> /home/coder/debug-podman.sh && \
+    echo 'ls -la /etc/containers/ 2>/dev/null || echo "/etc/containers/ not found"' >> /home/coder/debug-podman.sh && \
+    chmod +x /home/coder/debug-podman.sh
+
 RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
     echo 'echo "Resetting Podman storage and reinitializing..."' >> /home/coder/reset-podman.sh && \
     echo 'sudo rm -rf /var/lib/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
-    echo 'rm -rf ~/.local/share/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
-    echo 'rm -rf ~/.local/share/containers/runroot/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
-    echo 'sudo mkdir -p /var/lib/containers/storage /run/containers /tmp/libpod' >> /home/coder/reset-podman.sh && \
-    echo 'sudo chmod 1777 /tmp' >> /home/coder/reset-podman.sh && \
+    echo 'sudo rm -rf /run/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
+    echo 'sudo mkdir -p /var/lib/containers/storage /run/containers/storage' >> /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system reset --force 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'sudo /usr/bin/podman-original system migrate 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
     echo 'echo "Podman storage reset and migration complete"' >> /home/coder/reset-podman.sh && \
