@@ -1,178 +1,97 @@
-# UBI8-based image with rootless Podman for Coder workspaces
+# Minimal UBI8 Base Image with Buildah for Coder Workspaces
 FROM registry.access.redhat.com/ubi8/ubi:latest
 
-# Set labels
-LABEL maintainer="Coder Template" \
-      description="UBI8 with rootless Podman for development workspaces" \
-      version="1.0"
+LABEL maintainer="Coder Workspace" \
+      description="Minimal UBI8 image with Buildah for container building" \
+      version="2.0-minimal"
 
-# Create coder user with proper UID/GID for Kubernetes
-RUN groupadd -g 1000 coder && \
-    useradd -m -u 1000 -g 1000 -s /bin/bash coder
+# Set environment variables
+ENV USER=coder \
+    HOME=/home/coder \
+    XDG_RUNTIME_DIR=/home/coder/.local/share/containers/runroot \
+    BUILDAH_ISOLATION=chroot
 
-# Install required packages
+# Create coder user with specific UID/GID for consistency
+RUN useradd -m -s /bin/bash -u 1000 coder && \
+    echo "coder ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Install minimal required packages only (exactly matching template)
 RUN dnf update -y && \
     dnf install -y \
-        podman \
-        crun \
-        fuse-overlayfs \
-        curl \
         git \
-        sudo \
-        which \
-        procps-ng \
-        shadow-utils && \
-    dnf clean all
+        curl \
+        buildah \
+        fuse-overlayfs \
+        slirp4netns \
+    && dnf clean all
 
-# Configure subuid and subgid for rootless operation
+# Configure subuid and subgid for rootless containers
 RUN echo "coder:100000:65536" >> /etc/subuid && \
     echo "coder:100000:65536" >> /etc/subgid && \
     chmod 644 /etc/subuid /etc/subgid
 
-# Configure sudo for coder user (needed for some operations)
-RUN echo "coder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+# Create necessary directories for coder user
+RUN mkdir -p /home/coder/.config/containers && \
+    mkdir -p /home/coder/.local/share/containers/{storage,runroot} && \
+    chown -R coder:coder /home/coder
 
-# Set environment variables for Podman (rootful mode uses system locations)
-ENV TMPDIR="/tmp"
-
-# Create necessary system directories for Podman
-RUN mkdir -p /var/lib/containers/storage && \
-    mkdir -p /run/containers/storage && \
-    chmod 1777 /tmp && \
-    chmod 755 /var/lib/containers && \
-    chmod 755 /run/containers
-
-# Create a wrapper script for Podman to run as root with explicit flags
-RUN if [ -f /usr/bin/podman ]; then \
-        mv /usr/bin/podman /usr/bin/podman-original; \
-    else \
-        echo "Warning: /usr/bin/podman not found, looking for alternatives..."; \
-        find /usr -name "*podman*" -type f 2>/dev/null || true; \
-    fi && \
-    echo '#!/bin/bash' > /usr/bin/podman && \
-    echo '# Ensure required directories exist for rootful Podman' >> /usr/bin/podman && \
-    echo 'sudo mkdir -p /var/lib/containers/storage /run/containers/storage' >> /usr/bin/podman && \
-    echo 'sudo chmod 1777 /tmp' >> /usr/bin/podman && \
-    echo '# Force rootful mode with explicit configuration paths' >> /usr/bin/podman && \
-    echo 'export CONTAINERS_CONF=/etc/containers/containers.conf' >> /usr/bin/podman && \
-    echo 'export CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf' >> /usr/bin/podman && \
-    echo 'export CONTAINERS_REGISTRIES_CONF=/etc/containers/registries.conf' >> /usr/bin/podman && \
-    echo '# Run Podman as root with systemd cgroup manager' >> /usr/bin/podman && \
-    echo 'exec sudo /usr/bin/podman-original "$@"' >> /usr/bin/podman && \
-    chmod +x /usr/bin/podman
-
-# Create system-level Podman configuration for rootful mode
-RUN mkdir -p /etc/containers && \
-    echo '[containers]' > /etc/containers/containers.conf && \
-    echo 'netns = "host"' >> /etc/containers/containers.conf && \
-    echo 'userns = ""' >> /etc/containers/containers.conf && \
-    echo 'seccomp_profile = ""' >> /etc/containers/containers.conf && \
-    echo 'apparmor_profile = ""' >> /etc/containers/containers.conf && \
-    echo 'default_network = "host"' >> /etc/containers/containers.conf && \
-    echo 'network_backend = "none"' >> /etc/containers/containers.conf && \
-    echo '' >> /etc/containers/containers.conf && \
-    echo '[engine]' >> /etc/containers/containers.conf && \
-    echo 'cgroup_manager = "none"' >> /etc/containers/containers.conf && \
-    echo 'events_logger = "file"' >> /etc/containers/containers.conf && \
-    echo 'runtime = "crun"' >> /etc/containers/containers.conf
-
-# Create storage configuration file separately
-RUN echo '[storage]' > /etc/containers/storage.conf && \
-    echo 'driver = "vfs"' >> /etc/containers/storage.conf && \
-    echo 'runroot = "/run/containers/storage"' >> /etc/containers/storage.conf && \
-    echo 'graphroot = "/var/lib/containers/storage"' >> /etc/containers/storage.conf
-
-# Configure registries for system-level Podman
-RUN echo '[registries.search]' > /etc/containers/registries.conf && \
-    echo "registries = ['docker.io', 'quay.io', 'registry.redhat.io']" >> /etc/containers/registries.conf && \
-    echo '' >> /etc/containers/registries.conf && \
-    echo '[registries.insecure]' >> /etc/containers/registries.conf && \
-    echo 'registries = []' >> /etc/containers/registries.conf && \
-    echo '' >> /etc/containers/registries.conf && \
-    echo '[registries.block]' >> /etc/containers/registries.conf && \
-    echo 'registries = []' >> /etc/containers/registries.conf
-
-# Remove any user-space configuration that might interfere with rootful mode
-RUN rm -rf /home/coder/.config/containers 2>/dev/null || true && \
-    rm -rf /home/coder/.local/share/containers 2>/dev/null || true
-
-# Switch to coder user
+# Configure Buildah for the coder user
 USER coder
 WORKDIR /home/coder
 
-# Create debugging and helper scripts
-RUN echo '#!/bin/bash' > /home/coder/debug-podman.sh && \
-    echo 'echo "=== Podman Debug Information ==="' >> /home/coder/debug-podman.sh && \
-    echo 'echo "User: $(whoami)"' >> /home/coder/debug-podman.sh && \
-    echo 'echo "Podman wrapper location:"' >> /home/coder/debug-podman.sh && \
-    echo 'ls -la /usr/bin/podman* 2>/dev/null || echo "No podman binaries found in /usr/bin/"' >> /home/coder/debug-podman.sh && \
-    echo 'echo "Podman version (if available):"' >> /home/coder/debug-podman.sh && \
-    echo 'if [ -f /usr/bin/podman-original ]; then' >> /home/coder/debug-podman.sh && \
-    echo '    sudo /usr/bin/podman-original --version 2>/dev/null || echo "Failed to get version from podman-original"' >> /home/coder/debug-podman.sh && \
-    echo 'elif [ -f /usr/bin/podman ]; then' >> /home/coder/debug-podman.sh && \
-    echo '    /usr/bin/podman --version 2>/dev/null || echo "Failed to get version from podman wrapper"' >> /home/coder/debug-podman.sh && \
-    echo 'else' >> /home/coder/debug-podman.sh && \
-    echo '    echo "No podman binary found"' >> /home/coder/debug-podman.sh && \
-    echo 'fi' >> /home/coder/debug-podman.sh && \
-    echo 'echo "Directory structure:"' >> /home/coder/debug-podman.sh && \
-    echo 'ls -la /var/lib/containers/ 2>/dev/null || echo "/var/lib/containers/ not found"' >> /home/coder/debug-podman.sh && \
-    echo 'ls -la /run/containers/ 2>/dev/null || echo "/run/containers/ not found"' >> /home/coder/debug-podman.sh && \
-    echo 'ls -la /etc/containers/ 2>/dev/null || echo "/etc/containers/ not found"' >> /home/coder/debug-podman.sh && \
-    echo 'echo "PATH: $PATH"' >> /home/coder/debug-podman.sh && \
-    echo 'echo "Environment variables:"' >> /home/coder/debug-podman.sh && \
-    echo 'env | grep CONTAINERS || echo "No CONTAINERS env vars"' >> /home/coder/debug-podman.sh && \
-    echo 'echo "Configuration file contents:"' >> /home/coder/debug-podman.sh && \
-    echo 'echo "=== /etc/containers/containers.conf ==="' >> /home/coder/debug-podman.sh && \
-    echo 'cat /etc/containers/containers.conf 2>/dev/null || echo "File not found"' >> /home/coder/debug-podman.sh && \
-    echo 'echo "=== /etc/containers/storage.conf ==="' >> /home/coder/debug-podman.sh && \
-    echo 'cat /etc/containers/storage.conf 2>/dev/null || echo "File not found"' >> /home/coder/debug-podman.sh && \
-    chmod +x /home/coder/debug-podman.sh
+# Create Buildah configuration files
+RUN mkdir -p ~/.config/containers
 
-RUN echo '#!/bin/bash' > /home/coder/reset-podman.sh && \
-    echo 'echo "Resetting Podman storage and configuration..."' >> /home/coder/reset-podman.sh && \
-    echo 'sudo rm -rf /var/lib/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
-    echo 'sudo rm -rf /run/containers/storage/* 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
-    echo 'sudo mkdir -p /var/lib/containers/storage /run/containers/storage' >> /home/coder/reset-podman.sh && \
-    echo 'echo "Recreating clean configuration files..."' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'[storage]'"'"' > /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'driver = \"vfs\"'"'"' >> /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'runroot = \"/run/containers/storage\"'"'"' >> /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'graphroot = \"/var/lib/containers/storage\"'"'"' >> /etc/containers/storage.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'echo "Recreating containers.conf with cgroup disabled..."' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'[containers]'"'"' > /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'netns = \"host\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'userns = \"\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'default_network = \"host\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'network_backend = \"none\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'[engine]'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'cgroup_manager = \"none\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo sh -c "echo '"'"'runtime = \"crun\"'"'"' >> /etc/containers/containers.conf"' >> /home/coder/reset-podman.sh && \
-    echo 'sudo /usr/bin/podman-original system reset --force 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
-    echo 'sudo /usr/bin/podman-original system migrate 2>/dev/null || true' >> /home/coder/reset-podman.sh && \
-    echo 'echo "Podman storage reset and migration complete"' >> /home/coder/reset-podman.sh && \
-    chmod +x /home/coder/reset-podman.sh
+# Configure containers.conf for Buildah (minimal - matching template)
+RUN echo '[containers]' > ~/.config/containers/containers.conf && \
+    echo 'netns = "host"' >> ~/.config/containers/containers.conf && \
+    echo 'userns = ""' >> ~/.config/containers/containers.conf
 
-# Create a test script to verify rootful mode
-RUN echo '#!/bin/bash' > /home/coder/test-rootful.sh && \
-    echo 'echo "Testing if Podman is running in rootful mode..."' >> /home/coder/test-rootful.sh && \
-    echo 'export CONTAINERS_CONF=/etc/containers/containers.conf' >> /home/coder/test-rootful.sh && \
-    echo 'export CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf' >> /home/coder/test-rootful.sh && \
-    echo 'export CONTAINERS_REGISTRIES_CONF=/etc/containers/registries.conf' >> /home/coder/test-rootful.sh && \
-    echo 'echo "Running: sudo /usr/bin/podman-original info --format \"{{.Store.RunRoot}}\""' >> /home/coder/test-rootful.sh && \
-    echo 'sudo /usr/bin/podman-original info --format "{{.Store.RunRoot}}" 2>/dev/null || echo "Failed to get storage info"' >> /home/coder/test-rootful.sh && \
-    echo 'echo "Cgroup manager:"' >> /home/coder/test-rootful.sh && \
-    echo 'sudo /usr/bin/podman-original info --format "{{.Host.CgroupManager}}" 2>/dev/null || echo "Failed to get cgroup manager"' >> /home/coder/test-rootful.sh && \
-    chmod +x /home/coder/test-rootful.sh
+# Configure registries.conf
+RUN echo '[registries.search]' > ~/.config/containers/registries.conf && \
+    echo "registries = ['registry.access.redhat.com', 'registry.redhat.io', 'docker.io', 'quay.io']" >> ~/.config/containers/registries.conf && \
+    echo '' >> ~/.config/containers/registries.conf && \
+    echo '[registries.insecure]' >> ~/.config/containers/registries.conf && \
+    echo 'registries = []' >> ~/.config/containers/registries.conf && \
+    echo '' >> ~/.config/containers/registries.conf && \
+    echo '[registries.block]' >> ~/.config/containers/registries.conf && \
+    echo 'registries = []' >> ~/.config/containers/registries.conf
 
-# Verify Podman installation and wrapper
-RUN echo "Checking Podman installation..." && \
-    ls -la /usr/bin/podman* && \
-    cat /usr/bin/podman && \
-    echo "Testing Podman wrapper..." && \
-    /usr/bin/podman --version || echo "Podman wrapper test failed"
+# Configure storage.conf for VFS driver (minimal - matching template)
+RUN echo '[storage]' > ~/.config/containers/storage.conf && \
+    echo 'driver = "vfs"' >> ~/.config/containers/storage.conf
 
-# Initialize Podman storage with proper migration
-RUN sudo /usr/bin/podman-original system migrate 2>/dev/null || true
+# Configure Buildah policy (minimal - matching template)
+RUN echo '{' > ~/.config/containers/policy.json && \
+    echo '    "default": [{"type": "insecureAcceptAnything"}]' >> ~/.config/containers/policy.json && \
+    echo '}' >> ~/.config/containers/policy.json
 
-# Set default command
+# Set up minimal shell environment
+RUN echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc && \
+    echo 'export XDG_RUNTIME_DIR=/home/coder/.local/share/containers/runroot' >> ~/.bashrc && \
+    echo 'export BUILDAH_ISOLATION=chroot' >> ~/.bashrc
+
+# Install code-server for VS Code in browser
+RUN curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/home/coder/.local
+
+# Create a minimal welcome script
+RUN echo '#!/bin/bash' > ~/welcome-buildah.sh && \
+    echo 'echo "🎉 UBI8 + Buildah workspace ready!"' >> ~/welcome-buildah.sh && \
+    echo 'echo "📦 Installed: Buildah $(buildah --version | head -1)"' >> ~/welcome-buildah.sh && \
+    echo 'echo "📍 Example: buildah from registry.access.redhat.com/ubi8/ubi:latest"' >> ~/welcome-buildah.sh
+
+RUN chmod +x ~/welcome-buildah.sh
+
+# Verify Buildah installation
+RUN buildah --version
+
+# Set working directory and default user
+WORKDIR /home/coder
+USER coder
+
+# Default command
 CMD ["/bin/bash"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD buildah --version || exit 1
