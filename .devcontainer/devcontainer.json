@@ -1,27 +1,5 @@
 {
   "build": {
     "dockerfile": "Dockerfile"
-  },
-  "runArgs": [
-    "--device=/dev/fuse",
-    "--cap-add=SYS_ADMIN",
-    "--cap-add=NET_ADMIN",
-    "--cap-add=SETUID",
-    "--cap-add=SETGID",
-    "--cap-add=SYS_RESOURCE",
-    "--security-opt",
-    "seccomp=unconfined",
-    "--security-opt",
-    "apparmor=unconfined",
-    "--tmpfs",
-    "/tmp:exec,suid,size=2g",
-    "--tmpfs",
-    "/run:exec,suid,size=2g"
-  ],
-  "containerEnv": {
-    "TMPDIR": "/tmp",
-    "CONTAINERS_CONF": "/etc/containers/containers.conf",
-    "CONTAINERS_STORAGE_CONF": "/etc/containers/storage.conf",
-    "CONTAINERS_REGISTRIES_CONF": "/etc/containers/registries.conf"
   }
 }
