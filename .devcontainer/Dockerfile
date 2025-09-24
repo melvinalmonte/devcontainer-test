@@ -23,6 +23,7 @@ RUN dnf update -y && \
         buildah \
         fuse-overlayfs \
         slirp4netns \
+        procps-ng \
     && dnf clean all
 
 # Configure subuid and subgid for rootless containers
