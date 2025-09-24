@@ -58,9 +58,11 @@ RUN echo '[registries.search]' > ~/.config/containers/registries.conf && \
     echo '[registries.block]' >> ~/.config/containers/registries.conf && \
     echo 'registries = []' >> ~/.config/containers/registries.conf
 
-# Configure storage.conf for VFS driver (minimal - matching template)
+# Configure storage.conf for VFS driver and ignore chown errors
 RUN echo '[storage]' > ~/.config/containers/storage.conf && \
-    echo 'driver = "vfs"' >> ~/.config/containers/storage.conf
+    echo 'driver = "vfs"' >> ~/.config/containers/storage.conf && \
+    echo '[storage.options]' >> ~/.config/containers/storage.conf && \
+    echo 'ignore_chown_errors = "true"' >> ~/.config/containers/storage.conf
 
 # Configure Buildah policy (minimal - matching template)
 RUN echo '{' > ~/.config/containers/policy.json && \
