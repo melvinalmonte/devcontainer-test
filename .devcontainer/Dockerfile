@@ -61,6 +61,8 @@ RUN echo '[registries.search]' > ~/.config/containers/registries.conf && \
 # Configure storage.conf for overlay driver with fuse-overlayfs
 RUN echo '[storage]' > ~/.config/containers/storage.conf && \
     echo 'driver = "overlay"' >> ~/.config/containers/storage.conf && \
+    echo '[storage.options]' >> ~/.config/containers/storage.conf && \
+    echo 'ignore_chown_errors = "true"' >> ~/.config/containers/storage.conf && \
     echo '[storage.options.overlay]' >> ~/.config/containers/storage.conf && \
     echo 'mount_program = "/usr/bin/fuse-overlayfs"' >> ~/.config/containers/storage.conf
 
