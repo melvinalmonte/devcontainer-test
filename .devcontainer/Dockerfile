@@ -46,7 +46,7 @@ RUN mkdir -p ~/.config/containers
 # Configure containers.conf for Buildah (minimal - matching template)
 RUN echo '[containers]' > ~/.config/containers/containers.conf && \
     echo 'netns = "host"' >> ~/.config/containers/containers.conf && \
-    echo 'userns = ""' >> ~/.config/containers/containers.conf
+    echo 'userns = "host"' >> ~/.config/containers/containers.conf
 
 # Configure registries.conf
 RUN echo '[registries.search]' > ~/.config/containers/registries.conf && \
