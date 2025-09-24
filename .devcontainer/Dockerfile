@@ -88,10 +88,3 @@ RUN buildah --version
 # Set working directory and default user
 WORKDIR /home/coder
 USER coder
-
-# Default command
-CMD ["/bin/bash"]
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD buildah --version || exit 1
