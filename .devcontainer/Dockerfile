@@ -88,3 +88,6 @@ RUN buildah --version
 # Set working directory and default user
 WORKDIR /home/coder
 USER coder
+
+# Default command
+CMD ["/bin/bash"]
